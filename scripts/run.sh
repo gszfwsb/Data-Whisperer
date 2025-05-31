@@ -2,6 +2,7 @@ BASE_PATH="."
 METHOD=datawhisperer
 GPUS=1
 
+
 # Set datasets
 DATASET=dialogsum # Support bioinstruct, gsm8k, dialogsum
 
@@ -19,6 +20,8 @@ BATCH_TEST=3
 
 # Set parallel size
 PARALLEL=1
+
+
 
 # Run pruning experiment
 EXP_NAME=${MODEL}_${DATASET}_${METHOD}_${METRIC}_${BATCH_TRAIN}_${BATCH_TEST}_${PARALLEL}
