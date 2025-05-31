@@ -4,8 +4,8 @@ Code for ACL 2025 Main paper ["Data Whisperer: Efficient Data Selection for Task
 ## Getting Started
 ### 🛠️ Setup
 ```sh
-conda create -y -n datawhisperer python=3.10
-conda activate datawhisperer
+git clone https://github.com/gszfwsb/Data-Whisperer.git
+cd Data-Whisperer
 pip install -r requirements.txt
 ```
 ### 🧪 Experiments
