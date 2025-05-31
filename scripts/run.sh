@@ -11,7 +11,7 @@ METRIC=rouge-L # Support rouge-L, exact_match
 # Set model configurations
 MODEL_TYPE=llama3_8b  # Support llama3_8b, qwen, mistral
 MODEL=Llama-3-8B-Instruct  # Support Llama-3-8B-Instruct, Qwen2.5-7B-Instruct, Qwen2.5-3B-Instruct, Mistral-Nemo-Instruct-2407, Mistral-7B-Instruct-v0.2
-MODEL_PATH=/root/autodl-tmp/Meta-Llama-3-8B-Instruct # <YOUR_MODEL_PATH> 
+MODEL_PATH= # <YOUR_MODEL_PATH> 
 
 # Set numbers of samples for demonstration and query
 BATCH_TRAIN=5
