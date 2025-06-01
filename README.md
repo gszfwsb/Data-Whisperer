@@ -66,11 +66,11 @@ Upon completion of the experiment, the scored dataset will be generated and stor
 ## 📝 Citation
 If you find **Data Whisperer** useful for your research and applications, please kindly cite using this BibTeX:
 ```latex
-@article{wang2025data,
-  title={Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning},
-  author={Wang, Shaobo and Wang, Ziming and Jin, Xiangqi and Wang, Jize and Zhang, Jiajun and Li, Kaixin and Wen, Zichen and Li, Zhong and He, Conghui and Hu, Xuming and others},
-  journal={arXiv preprint arXiv:2505.12212},
-  year={2025}
+@article{wang2025datawhisperer,
+  title = {Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning},
+  author = {Wang, Shaobo and Jin, Xiangqi and Wang, Ziming and Wang, Jize and Zhang, Jiajun and Li, Kaixin and Wen, Zichen and Li, Zhong and He, Conghui and Hu, Xuming and Zhang, Linfeng},
+  year = {2025},
+  journal = {Annual Meeting of the Association for Computational Linguistics},
 }
 ```
 
