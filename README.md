@@ -1,5 +1,22 @@
-# Data-Whisperer
-Code for ACL 2025 Main paper ["Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning"](https://arxiv.org/pdf/2505.12212).
+# Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning
+
+This repository contains a reference implementation for ACL 2025 main paper [Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning](https://arxiv.org/pdf/2505.12212).
+
+[Shaobo Wang*<sup>1,2</sup>](https://gszfwsb.github.io/), Xiangqi Jin<sup>2</sup>, Ziming Wang<sup>2,3</sup>, [Jize Wang<sup>1</sup>](https://jize-w.github.io/), Jiajun Zhang<sup>2</sup>,  
+[Kaixin Li<sup>4</sup>](https://likaixin2000.github.io/), Zichen Wen<sup>2</sup>, [Zhong Li<sup>5</sup>](https://www.microsoft.com/en-us/research/people/lzhong/), [Conghui He<sup>6</sup>](https://conghui.github.io/), [Xuming Hu<sup>7</sup>](https://xuminghu.github.io/), [Linfeng Zhang†<sup>1,2</sup>](http://www.zhanglinfeng.tech/)
+
+*Equal contribution, †Corresponding author   
+<sup>1</sup>Shanghai Jiao Tong University <sup>2</sup>EPIC Lab, Shanghai Jiao Tong University <sup>3</sup>Nanyang Technological University  
+<sup>4</sup>National University of Singapore <sup>5</sup>Microsoft Research Asia <sup>6</sup>Shanghai AI Laboratory  
+<sup>7</sup>Hong Kong University of Science and Technology (Guangzhou)
+
+## Pipeline
+<img width="825" alt="image" src="https://github.com/user-attachments/assets/37b5958f-1c55-447a-ae54-05f30b7bc224" />
+
+(I) **Few-shot In-Context Learning.**   
+A set of demonstration and query examples is randomly sampled from the initial dataset, and an ICL prompt is constructed with a fixed instruction. The LLM to be fine-tuned generates answers for all query examples, and the average evaluation score is computed using the ground truth answers.   
+(II) **Context-Aware Weighting.**   
+During each iteration of few-shot ICL, we weight the scores of the demonstration examples based on their attention scores, which quantify their influence on the queries.
 
 ## 🔧 Getting Started
 ### 🛠️ Setup
