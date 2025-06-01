@@ -1,7 +1,7 @@
 # Data-Whisperer
 Code for ACL 2025 Main paper ["Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning"](https://arxiv.org/pdf/2505.12212).
 
-## Getting Started
+## 🔧 Getting Started
 ### 🛠️ Setup
 ```sh
 git clone https://github.com/gszfwsb/Data-Whisperer.git
