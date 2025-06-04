@@ -5,7 +5,7 @@ This repository contains a reference implementation for ACL 2025 main paper [Dat
 [Shaobo Wang*<sup>1,2</sup>](https://gszfwsb.github.io/), Xiangqi Jin<sup>2</sup>, Ziming Wang<sup>2,3</sup>, [Jize Wang<sup>1</sup>](https://jize-w.github.io/), Jiajun Zhang<sup>2</sup>,  
 [Kaixin Li<sup>4</sup>](https://likaixin2000.github.io/), Zichen Wen<sup>2</sup>, [Zhong Li<sup>5</sup>](https://www.microsoft.com/en-us/research/people/lzhong/), [Conghui He<sup>6</sup>](https://conghui.github.io/), [Xuming Hu<sup>7</sup>](https://xuminghu.github.io/), [Linfeng Zhang†<sup>1,2</sup>](http://www.zhanglinfeng.tech/)
 
-*Equal contribution, †Corresponding author   
+*Project Lead, †Corresponding author   
 <sup>1</sup>Shanghai Jiao Tong University <sup>2</sup>EPIC Lab, Shanghai Jiao Tong University <sup>3</sup>Nanyang Technological University  
 <sup>4</sup>National University of Singapore <sup>5</sup>Microsoft Research Asia <sup>6</sup>Shanghai AI Laboratory  
 <sup>7</sup>Hong Kong University of Science and Technology (Guangzhou)
