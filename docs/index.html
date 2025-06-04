@@ -1,186 +1,697 @@
-<center><h1>Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning</h1></center>
 
-<p align="center">
-  <a href="https://gszfwsb.github.io/">Shaobo Wang</a><sup>1,2,*</sup>&nbsp
-  <a href="#">Xiangqi Jin</a><sup>2,*</sup>&nbsp
-  <a href="#">Ziming Wang</a><sup>2,3,*</sup>&nbsp
-  <a href="https://jize-w.github.io/">Jize Wang</a><sup>1</sup>&nbsp
-  <a href="#">Jiajun Zhang</a><sup>2</sup> <br>
-  <a href="https://likaixin2000.github.io/">Kaixin Li</a><sup>4</sup>&nbsp
-  <a href="#">Zichen Wen</a><sup>2</sup>&nbsp
-  <a href="https://www.microsoft.com/en-us/research/people/lzhong/">Zhong Li</a><sup>5</sup>&nbsp
-  <a href="https://conghui.github.io/">Conghui He</a><sup>6</sup>&nbsp
-  <a href="https://xuminghu.github.io/">Xuming Hu</a><sup>7</sup>&nbsp
-  <a href="http://www.zhanglinfeng.tech/">Linfeng Zhang</a><sup>1,2,✉</sup>
-</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning"> 
+  <meta name="keywords" content="In Context Learning, Fine-Tuning, Data Selection, Shanghai Jiao Tong University"> <!-- TODO: add some keywords for search engine -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning</title>
 
-<p align="center">
-  <sup>1</sup>Shanghai Jiao Tong University &nbsp
-  <sup>2</sup>EPIC Lab, Shanghai Jiao Tong University &nbsp <br>
-  <sup>3</sup>Nanyang Technological University &nbsp
-  <sup>4</sup>National University of Singapore &nbsp <br>
-  <sup>5</sup>Microsoft Research Asia &nbsp
-  <sup>6</sup>Shanghai AI Laboratory &nbsp <br>
-  <sup>7</sup>Hong Kong University of Science and Technology (Guangzhou)
-</p>
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
 
-<p align="center">
-  *Equal contribution &nbsp
-  ✉Corresponding author &nbsp
-</p>
+    function gtag() {
+      dataLayer.push(arguments);
+    }
 
-<p align="center">
-  Emails: <a href="mailto:shaobowang1009@sjtu.edu.cn">shaobowang1009@sjtu.edu.cn</a> &nbsp
-  <a href="mailto:zhanglinfeng@sjtu.edu.cn">zhanglinfeng@sjtu.edu.cn</a>
-</p>
+    gtag('js', new Date());
 
-<p align="center">
+    gtag('config', 'G-PYVRSFMDRL');
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
-  <span style="background-color:black; color:white; padding:6px 16px; border-radius:999px; margin:4px; display:inline-block;">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg" alt="PDF" width="16" style="vertical-align:middle; margin-right:6px;">
-    <a href="https://arxiv.org/pdf/2505.12212" style="color:white; text-decoration:none;">Paper</a>
-  </span>
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
 
-  <span style="background-color:black; color:white; padding:6px 16px; border-radius:999px; margin:4px; display:inline-block;">
-    <img src="./figs/arxiv-logomark-small.svg" alt="arXiv" width="16" style="vertical-align:middle; margin-right:6px;">
-    <a href="https://arxiv.org/abs/2505.12212" style="color:white; text-decoration:none;">arXiv</a>
-  </span>
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome_6_7_2.all.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
 
-  <span style="background-color:black; color:white; padding:6px 16px; border-radius:999px; margin:4px; display:inline-block;">
-    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" width="16" style="vertical-align:middle; margin-right:6px; filter:invert(1);">
-    <a href="https://github.com/gszfwsb/Data-Whisperer" style="color:white; text-decoration:none;">GitHub</a>
-  </span>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome_6_7_2.all.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+<body>
 
-</p>
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+</nav>
 
-<br><br>
 
-<img width="825" alt="image" src="https://github.com/user-attachments/assets/37b5958f-1c55-447a-ae54-05f30b7bc224" />
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning
+          </h1>
 
-(I) **Few-shot In-Context Learning.**   
-A set of demonstration and query examples is randomly sampled from the initial dataset, and an ICL prompt is constructed with a fixed instruction. The LLM to be fine-tuned generates answers for all query examples, and the average evaluation score is computed using the ground truth answers.   
-(II) **Context-Aware Weighting.**   
-During each iteration of few-shot ICL, we weight the scores of the demonstration examples based on their attention scores, which quantify their influence on the queries.
+          <div class="publication-authors">
+              <!-- 作者列表 -->
+            <div class="is-size-4 author-list">
+              <span class="author-block">
+                <a href="https://gszfwsb.github.io/" class="author-name">Shaobo Wang</a><sup class="affiliation">1,2</sup>
+              </span>
+              <span class="author-block">
+                <a href="" class="author-name">Xiangqi Jin</a><sup class="affiliation">2,†</sup>
+              </span>
+              <span class="author-block">
+                <a href="" class="author-name">Ziming Wang</a><sup class="affiliation">2,3,†</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://jize-w.github.io/" class="author-name">Jize Wang</a><sup class="affiliation">1</sup>
+              </span>
+              <span class="author-block">
+                <a href="" class="author-name">Jiajun Zhang</a><sup class="affiliation">2</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://likaixin2000.github.io/" class="author-name">Kaixin Li</a><sup class="affiliation">4</sup>
+              </span>
+              <span class="author-block">
+                <a href="" class="author-name">Zichen Wen</a><sup class="affiliation">2</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://www.microsoft.com/en-us/research/people/lzhong/" class="author-name">Zhong Li</a><sup class="affiliation">5</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://conghui.github.io/" class="author-name">Conghui He</a><sup class="affiliation">6</sup>
+              </span>
+              <span class="author-block">
+                <a href="https://xuminghu.github.io/" class="author-name">Xuming Hu</a><sup class="affiliation">7</sup>
+              </span>
+              <span class="author-block">
+                <a href="http://www.zhanglinfeng.tech/" class="author-name">Linfeng Zhang</a><sup class="affiliation">1,2,&#9993;</sup>
+              </span>
+            </div>
+          
+            <!-- 机构信息 -->
+            <div class="institutions is-size-5">
+              <span class="institution"><sup>1</sup><a >Shanghai Jiao Tong University</a></span>
+              <span class="institution">&nbsp;&nbsp;</span> <!-- 间隔符 -->
+              <span class="institution"><sup>2</sup><a >EPIC Lab, Shanghai Jiao Tong University</a></span>
+              <span class="institution">&nbsp;&nbsp;</span> <!-- 间隔符 -->
+              <span class="institution"><sup>3</sup><a >Nanyang Technological University</a></span>
+              <span class="institution">&nbsp;&nbsp;</span> <!-- 间隔符 -->
+              <span class="institution"><sup>4</sup><a >National University of Singapore</a></span>
+              <span class="institution">&nbsp;&nbsp;</span> <!-- 间隔符 -->
+              <span class="institution"><sup>5</sup><a >Microsoft Research Asia</a></span>
+              <span class="institution">&nbsp;&nbsp;</span> <!-- 间隔符 -->
+              <span class="institution"><sup>6</sup><a >Shanghai AI Laboratory</a></span>
+              <span class="institution">&nbsp;&nbsp;</span> <!-- 间隔符 -->
+              <span class="institution"><sup>7</sup><a >Hong Kong University of Science and Technology (Guangzhou)</a></span>
+            </div>
+          
+            <!-- 贡献说明 -->
+            <div class="contribution-notes is-size-5">
+              <span class="note"><sup>&#9993;</sup> Corresponding Authors</span>
+              <span class="note">&nbsp;&nbsp;</span>
+              <span class="note"><sup>†</sup>Equal contribution</span>
+            </div>
+          
+            <div class="corresponding-authors is-size-5">
+              Emails: 
+              <a href="shaobowang1009@sjtu.edu.cn">
+                shaobowang1009@sjtu.edu.cn
+              </a>, 
+              <a href="zhanglinfeng@sjtu.edu.cn">
+                zhanglinfeng@sjtu.edu.cn
+              </a>
+            </div>
+          </div>
 
-<center><h2>Takeaways</h2></center>
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2505.12212"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <!-- <i class="fas fa-file-pdf"></i> -->
+                      <i class="fa-solid fa-file-pdf" style="color: #ec4646;"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <!-- Arxiv Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2505.12212"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a href="https://github.com/gszfwsb/Data-Whisperer"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>GitHub</span>
+                  </a>
+              </span>
+              <!-- Dataset Link. -->
+              <!-- <span class="link-block">
+                <a href="https://huggingface.co/datasets/BytedTsinghua-SIA/DAPO-Math-17k"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fa-regular fa-database"></i>
+                  </span>
+                  <span>Data</span>
+                  </a>
+              </span> -->
+              <!-- Model Link. -->
+              <!-- <span class="link-block">
+                <a href="https://huggingface.co/BytedTsinghua-SIA/DAPO-Qwen-32B"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"> -->
+                    <!-- <i class="fa-solid fa-face-smiling-hands"></i> -->
+                    <!-- <i class="fa-solid fa-face-smiling-hands" style="color: #FFD43B;"></i>
+                  </span>
+                  <span>Model</span>
+                  </a>
+              </span> -->
+            </div>
 
-<div style="background-color: #f6fbf6; padding: 20px; border-radius: 12px; max-width: 800px; margin: auto;">
-  
-  <!-- 编号项 1 -->
-  <div style="display: flex; align-items: center; margin-bottom: 16px;">
-    <!-- 编号 -->
-    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
-      1
-    </div>
-    <!-- 箭头 -->
-    <div style="margin: 0 12px; flex-shrink: 0;">
-      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-      </svg>
-    </div>
-    <!-- 文字内容 -->
-    <div style="font-size: 16px; line-height: 1.5;">
-      <strong>Selection-to-Tuning Ratio.</strong> We critically examine existing data selection approaches and introduce the Selection-to-Tuning Ratio, a novel metric that quantifies the efficiency of these methods. We observed that all prior data selection methods are more inefficient than finetuning the LLM with the entire dataset.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+</section>
 
-  <!-- 编号项 2 -->
-  <div style="display: flex; align-items: center; margin-bottom: 16px;">
-    <!-- 编号 -->
-    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
-      2
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Video -->
+    <div class="columns is-centered">
+      <div class="column">
+        <p>
+            <strong>TL;DR:</strong> We propose an efficient, training-free, attention-based task-specific data selection method that leverages few-shot in-context learning with a pre-trained LLM.
+        </p>
+        </div>
+        </div>
+    </br>
+        <h2 class="subtitle has-text-centered">
+          <img src="./images/pipeline.png" style="display: block; margin: 0 auto; width: 80%;"/>
+        </h2>
+
+   </div>
+  </div>
+<!-- </section>    
+
+<section class="section"> -->
+
+  <div class="container is-max-desktop">
+    <!-- Abstract -->
+    <div class="columns is-centered has-text-centered">
+      <!-- <div class="column is-four-fifths"> -->
+          <div class="content has-text-justified">
+            <p>  
+            </p>  
+          </div>
+      <!-- </div> -->
     </div>
-    <!-- 箭头 -->
-    <div style="margin: 0 12px; flex-shrink: 0;">
-      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-      </svg>
-    </div>
-    <!-- 文字内容 -->
-    <div style="font-size: 16px; line-height: 1.5;">
-      <strong>Data Whisperer.</strong> We propose Data Whisperer, an effective, training-free and attention-based method. Unlike previous approaches, our method eliminates the need to fine-tune a separate scoring model on the target dataset, ensuring greater efficiency.
+   
+        <!-- <section class="section"> -->
+          <div class="columns is-centered has-text-centered">
+            <h2 class="title is-3"><br>Contributions</h2>
+          </div>
+          <div class="container is-max-desktop">
+          <!-- Q&A Section -->
+          <div class="columns is-centered">
+            <!-- <div class="qa-answer">
+              <div class="a-marker">
+                <span class="a-icon">1</span>
+              </div>
+              <div class="answer-text" style="font-size: 1em;">
+                <p>
+                  In CoTs, the majority of tokens are generated with low entropy, while only a small subset exhibits high entropy. These high-entropy minority tokens often act as "forks" in the reasoning process, guiding the model toward diverse reasoning paths. Maintaining high entropy at these critical forking tokens is beneficial for reasoning performance.
+                </p>
+              </div>
+            </div> -->
+
+            <div class="qa-answer" style="flex-direction: column; gap: 1rem;">
+              <div class="qa-row" style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                <div class="a-marker" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+                      <i class="fas fa-ruler-combined fa-2x fa-fw" style="color: #1f6110;"></i>
+                </div>
+                <div class="answer-text" style="font-size: 1em;">
+                  <p>
+                    <b>Selection-to-Tuning Ratio. </b> We critically examine existing data selection approaches and introduce the Selection-to-Tuning Ratio, a novel metric that quantifies the efficiency of these methods. We observed that all prior data selection methods are more inefficient than finetuning the LLM with the entire dataset.
+                  </p>
+                </div>
+              </div>
+
+              <div class="qa-row" style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                <div class="a-marker" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-dna fa-2x fa-fw" style="color: #1f6110;"></i>
+                </div>
+                <div class="answer-text" style="font-size: 1em;">
+                  <p>
+                    <b>Data Whisperer. </b>We propose Data Whisperer, an effective, training-free and attention-based method. Unlike previous approaches, our method eliminates the need to fine-tune a separate scoring model on the target dataset, ensuring greater efficiency.                  </p>
+                </div>
+              </div>
+
+              <div class="qa-row" style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                <div class="a-marker" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-link fa-2x fa-fw" style="color: #1f6110;"></i>
+                </div>
+                <div class="answer-text" style="font-size: 1em;">
+                  <p>
+                <b>Compatibility with Weak-to-Strong Few-shot ICL.</b> Data Whisperer integrates seamlessly with weak-to-strong few-shot ICL schemes, enabling effective performance even when a weaker model within the same model family is employed for ICL. This enhances both the scalability and efficiency of our method.                  </p>
+                </div>
+              </div>
+
+              <div class="qa-row" style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                <div class="a-marker" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-chart-bar fa-2x fa-fw" style="color: #1f6110;"></i>
+                </div>
+                <div class="answer-text" style="font-size: 1em;">
+                  <p>
+                    <b>Experimental Results.</b> Comprehensive experiments are conducted on both real and synthetic datasets across various selection budget ratios, including BioInstruct, DialogSum, and GSM8K. We observe that Data Whisperer consistently outperforms previous SOTA methods, particularly in smaller data scenarios, while achieving faster selection times.                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- <div class="qa-answer">
+              <div class="a-marker">
+                <span class="a-icon">3</span>
+              </div>
+              <div class="answer-text" style="font-size: 1em;">
+                <p>
+                  High-entropy minority tokens drive nearly all reasoning performance gains during RLVR, whereas low-entropy majority tokens contribute little or may even hinder performance. One possible explanation is that, prior to performance convergence, a subset ($\sim20\%$ in our experiments) of high-entropy tokens facilitates exploration, while low-entropy tokens offer minimal benefit or may even impede it.
+                </p>
+              </div>
+            </div>
+
+            <div class="qa-answer">
+              <div class="a-marker">
+                <span class="a-icon">4</span>
+              </div>
+              <div class="answer-text" style="font-size: 1em;">
+                <p>
+                  Based on the insights above, we further discuss (i) high-entropy minority tokens as a potential reason why supervised fine-tuning (SFT) memorizes but RL generalizes, (ii) how prior knowledge and readability requirements shape the different entropy patterns seen in LLM CoTs compared to traditional RL trajectories, and (iii) the advantage of clip-higher over entropy bonus for RLVR.
+                </p>
+              </div>
+            </div> -->
+
+          </div>
     </div>
   </div>
+<!-- </section> -->
 
-  <!-- 编号项 3 -->
-  <div style="display: flex; align-items: center; margin-bottom: 16px;">
-    <!-- 编号 -->
-    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
-      3
-    </div>
-    <!-- 箭头 -->
-    <div style="margin: 0 12px; flex-shrink: 0;">
-      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-      </svg>
-    </div>
-    <!-- 文字内容 -->
-    <div style="font-size: 16px; line-height: 1.5;">
-      <strong>Compatibility with Weak-to-Strong Few-shot ICL.</strong> Data Whisperer integrates seamlessly with weak-to-strong few-shot ICL schemes, enabling effective performance even when a weaker model within the same model family is employed for ICL. This enhances both the scalability and efficiency of our method.
+
+<!-- <section class="section"> -->
+<div class="container is-max-desktop">
+  <!-- Conclusion -->
+  <div class="columns is-centered has-text-centered">
+    <div class="column">
+      <h2 class="title is-3"><br>Selection-to-Tuning Ratio</h2>
+      <div class="content has-text-justified">
+        <p>
+          We first critically reevaluate the effectiveness of existing selection methods. 
+          To quantitatively and fairly assess the effectiveness of each method, we introduce 
+          the <i>Selection-to-Tuning Ratio</i> (STR), which is defined as the ratio of time 
+          spent on selection to the time required for fine-tuning the model on the entire dataset. 
+          Formally, let \( t_p(\tau,\rho) \) represent the time associated with a selection method 
+          \( \tau \) with a budget subset ratio \( \rho \), and let \( t_{ft} \) denote the 
+          corresponding fine-tuning time for the entire dataset. The STR is given by:
+        </p>
+        <p style="text-align: center;">
+          $$\text{STR}(\tau) = \frac{t_p(\tau,\rho)}{t_{ft}}.$$
+        </p>
+                  <img src="./images/str.png" style="display: block; margin: 0 auto; width: 85%;"/>
+
+      </div>
     </div>
   </div>
-
-  <!-- 编号项 4 -->
-  <div style="display: flex; align-items: center; margin-bottom: 16px;">
-    <!-- 编号 -->
-    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
-      4
-    </div>
-    <!-- 箭头 -->
-    <div style="margin: 0 12px; flex-shrink: 0;">
-      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-      </svg>
-    </div>
-    <!-- 文字内容 -->
-    <div style="font-size: 16px; line-height: 1.5;">
-      <strong>Experimental Validation.</strong> Comprehensive experiments are conducted on both real and synthetic datasets across various selection budget ratios, including BioInstruct, DialogSum, and GSM8K. We observe that Data Whisperer consistently outperforms previous SOTA methods, particularly in smaller data scenarios, while achieving faster selection times.
-    </div>
-  </div>
-
 </div>
 
-<center><h2>Selection-to-Tuning Ratio</h2></center>
+<!-- </section> -->
 
-We first critically reevaluate the effectiveness of existing selection methods. To quantitatively and fairly assess the effectiveness of each method, we introduce the $\textit{Selection-to-Tuning Ratio}$ (STR), which is defined as the ratio of time spent on selection to the time required for fine-tuning the model on the entire dataset. Formally, let $t_p(\tau,\rho)$ represent the time associated with a selection method $\tau$ with a budget subset ratio $\rho$, and let $t_{ft}$ denote the corresponding fine-tuning time for the entire dataset. The STR is given by:
 
-$$
-  \text{STR}(\tau) = \frac{t_p(\tau,\rho)}{t_{ft}}.
-$$
+<!-- <section class="section"> -->
+  <div class="container is-max-desktop">
+    <!-- Conclusion -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3"><br>Experimental Results</h2>
 
-<img src="./figs/performance_time.png" alt="performance_time" style="display:block; margin:0 auto;" width=400px /> <br>
+        <div class="content has-text-justified">
+          <ol>
+            <li>
+Compared to SOTA methods, Data Whisperer demonstrates consistent superiority across varying dataset sizes. On real datasets, as illustrated in Table 2, Data Whisperer achieves higher accuracy. For instance, on 10% data of DialogSum with Qwen-2.5-7B-Instruct, Data Whisperer attains an accuracy of 43.00, surpassing the previous SOTA method, STAFF, by a significant margin of 2.46.            </li>
+                  <img src="./images/real.png" style="display: block; margin: 0 auto; width: 85%;"/>
 
-<img src="./figs/str.png" alt="str" style="display:block; margin:0 auto;" />
 
-<center><h2>Experimental Validation</h2></center>
+          <li>
+Similarly, on synthetic datasets, as shown in Table 3, Data Whisperer consistently delivers the best performance across all evaluated models and data proportions, underscoring its robust generalization capabilities. Notably, with the Qwen-2.5-7B-Instruct model on 5% of the data, Data Whisperer achieves an accuracy of 31.27, outperforming the prior SOTA method, Nuggets, by a remarkable 2.87 points.           
+                  <img src="./images/synthetic.png" style="display: block; margin: 0 auto; width: 85%;"/>
 
-Compared to SOTA methods, Data Whisperer demonstrates consistent superiority across varying dataset sizes. On real datasets, as illustrated in Table 2, Data Whisperer achieves higher accuracy. For instance, on 10% data of DialogSum with Qwen-2.5-7B-Instruct, Data Whisperer attains an accuracy of 43.00, surpassing the previous SOTA method, STAFF, by a significant margin of 2.46.
+          </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- </section> -->
 
-<img src="./figs/real.png" alt="real" style="display:block; margin:0 auto;" /> <br>
 
-Similarly, on synthetic datasets, as shown in Table 3, Data Whisperer consistently delivers the best performance across all evaluated models and data proportions, underscoring its robust generalization capabilities. Notably, with the Qwen-2.5-7B-Instruct model on 5% of the data, Data Whisperer achieves an accuracy of 31.27, outperforming the prior SOTA method, Nuggets, by a remarkable 2.87 points.
 
-<img src="./figs/synthetic.png" alt="synthetic" style="display:block; margin:0 auto;" />
 
-<center><h2>Compatibility with Weak-to-Strong Few-shot ICL</h2></center>
+<!-- <section class="section"> -->
+  <div class="container is-max-desktop">
+    <!-- Conclusion -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3"><br>Compatibility with Weak-to-Strong Few-shot ICL</h2>
 
-We also investigated the impact of weak-to-strong scoring, where a weaker model is used to select data for fine-tuning a stronger model. As shown in Figure 3, results indicate that using a weaker model does not significantly impact the overall performance of Data Whisperer, while providing a more efficient solution with a lower STR. It demonstrates that Data Whisperer is scalable across different model sizes and highlights its potential for efficient fine-tuning, even with limited computational resources.
+        <div class="content has-text-justified">
+          <ol>
+           We also investigated the impact of weak-to-strong scoring, where a weaker model is used to select data for fine-tuning a stronger model. As shown in Figure 3, results indicate that using a weaker model does not significantly impact the overall performance of Data Whisperer, while providing a more efficient solution with a lower STR. It demonstrates that Data Whisperer is scalable across different model sizes and highlights its potential for efficient fine-tuning, even with limited computational resources.
+                  <img src="./images/weak2s.png" style="display: block; margin: 0 auto; width: 75%;"/>
+            <p style="font-size: 0.8rem;">
+Ablation on the weak-to-strong scalability.
+For Qwen models, we used Qwen-2.5-3B-Instruct to
+perform Data Whisperer for Qwen-2.5-7B-Instruct. For
+Mistral models, we used Mistral-7B-Instruct-v0.2 to perform Data Whisperer for Mistral-Nemo-Instruct-2407.
+Weaker models were not fine-tuned on the task dataset.
+We found that using a weaker model does not significantly affect performance and provides a more efficient
+solution (measured by STR). Best viewed in color.
+            </p>
 
-<img src="./figs/w2s.png" alt="w2s" style="display:block; margin:0 auto;" width=400px />
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- </section> -->
 
-<center><h2>Discussions</h2></center>
+  <div class="container is-max-desktop">
+    <!-- Conclusion -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3"><br>Discussions</h2>
 
-1. Low-perplexity majority samples (i.e., easy examples) may play a key role in explaining why SFT improves task performance in low-data regimes.
-2. Unlike general pretraining, task-specific fine-tuning aims to extract and refine task-relevant patterns. Consequently, SFT-selected subsets tend to consist of a mix skewed toward low-perplexity, high-confidence tokens, whereas the full dataset includes both predictable and ambiguous examples.
-3. In SFT, data selection may be biased, as it favors easier samples with low token entropy. In contrast, training on more diverse or challenging samples might enhance generalization but risks instability when data is scarce. Thus, selecting easy data effectively promotes alignment with task objectives in high-confidence regions of the data distribution.
+        <div class="content has-text-justified">
+          <ol>
+            
+            <li>
+              <b>Low-perplexity majority samples (i.e., easy examples) may play a key role in explaining why SFT improves task performance in low-data regimes.</b>
+            </li>
 
-<center><h2>BibTeX</h2></center>
+            <li>
+              <b>Unlike general pretraining, task-specific fine-tuning aims to extract and refine task-relevant patterns. Consequently, SFT-selected subsets tend to consist of a mix skewed toward low-perplexity, high-confidence tokens, whereas the full dataset includes both predictable and ambiguous examples.</b>
+            </li>
 
-```latex
-@article{wang2025datawhisperer,
+            
+            <li>
+              <b>In SFT, data selection may be biased, as it favors easier samples with low token entropy. In contrast, training on more diverse or challenging samples might enhance generalization but risks instability when data is scarce. Thus, selecting easy data effectively promotes alignment with task objectives in high-confidence regions of the data distribution.</b>
+            </li>
+
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<style>
+  .qa-card {
+    background: linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin: 2.5rem 0;
+    padding: 2.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .qa-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(255,0,0,0.15); /* 红色 */
+  }
+  
+  .qa-card:before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background: linear-gradient(180deg, #FF0000 0%, #308030 100%); /* 红到绿 */
+  }
+  
+  .q-marker {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .q-number {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #FF0000; /* 红色 */
+    min-width: 50px;
+    position: relative;
+  }
+  
+  .q-number:after {
+    content: "";
+    position: absolute;
+    right: -15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #308030;
+    border-radius: 50%;
+  }
+  
+  .q-icon, .a-icon {
+    font-size: 1.8rem;
+    font-weight: 800;
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  .q-icon {
+    background: linear-gradient(135deg, #FF0000 0%, #CC0000 100%); /* 红色渐变 */
+    color: white;
+  }
+  
+.a-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1f6110;
+  color: white;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+  margin-right: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+
+<!-- .a-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #2d6a4f;
+  color: white;
+  border-radius: 50%;
+
+} -->
+  .qa-question {
+    display: flex;
+    align-items: flex-start;
+  }
+  
+  .question-text {
+    font-size: 1.3rem;
+    color: #840b0b;
+    margin: 0;
+    line-height: 1.5;
+    position: relative;
+    padding-left: 2rem;
+  }
+  
+  .question-text:before {
+    content: "?";
+    position: absolute;
+    left: 0;
+    top: -0.2em;
+    font-size: 1.8em;
+    color: #FF0000; /* 红色 */
+    opacity: 0.2;
+    font-weight: 800;
+  }
+  
+  .qa-answer {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: rgba(76,175,80,0.05);
+    border-radius: 12px;
+    position: relative;
+    margin-left: 0rem;
+  }
+  
+  .answer-text {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #37474f;
+    position: relative;
+    padding-left: 2rem;
+  }
+  
+  .answer-text:before {
+    content: "➤";
+    position: absolute;
+    left: 0;
+    color: #308030;
+    font-size: 1.2em;
+    top: 0.1em;
+  }
+
+  @media (max-width: 480px) {
+    .qa-card {
+      padding: 1.2rem;
+      margin: 1.5rem 0;
+      border-radius: 12px;
+    }
+
+    .q-marker {
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .q-number {
+      font-size: 1.5rem !important;
+      min-width: 40px;
+    }
+
+    .q-icon, .a-icon {
+      width: 36px;
+      height: 36px;
+      font-size: 1.4rem;
+      border-radius: 8px;
+    }
+
+    .question-text {
+      font-size: 1.15rem;
+      line-height: 1.4;
+      padding-left: 1.5rem;
+    }
+
+    .qa-answer {
+      margin: 1.2rem 0 0 0;
+      padding: 1rem;
+      border-radius: 10px;
+      gap: 1rem;
+    }
+
+    .answer-text {
+      font-size: 1rem;
+      line-height: 1.6;
+      padding-left: 1.5rem;
+    }
+
+    .answer-text:before {
+      left: -0.2rem;
+    }
+
+    .qa-card:before {
+      width: 3px;
+    }
+
+    p {
+      margin-bottom: 0.8em !important;
+    }
+
+    .title.is-3 {
+      font-size: 1.5rem !important;
+      margin-bottom: 2rem !important;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .qa-card {
+      padding: 1.5rem;
+    }
+    @media (max-width: 480px) {
+      .qa-card {
+        padding: 1.2rem;
+      }
+    }
+  }
+  
+  /* @media (max-width: 768px) {
+    .qa-card {
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+    .qa-answer {
+      margin-left: 0;
+    }
+    .question-text {
+      padding-left: 0;
+    }
+    .question-text:before {
+      display: none;
+    }
+  } */
+</style>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Fully Open-Source -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">BibTeX</h2>
+        <div class="content has-text-justified">
+          <pre><code>@article{wang2025datawhisperer,
   title = {Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning},
   author = {Wang, Shaobo and Jin, Xiangqi and Wang, Ziming and Wang, Jize and Zhang, Jiajun and Li, Kaixin and Wen, Zichen and Li, Zhong and He, Conghui and Hu, Xuming and Zhang, Linfeng},
   year = {2025},
   journal = {Annual Meeting of the Association for Computational Linguistics},
 }
-```
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+</body>
+</html>
