@@ -1,0 +1,186 @@
+<center><h1>Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning</h1></center>
+
+<p align="center">
+  <a href="https://gszfwsb.github.io/">Shaobo Wang</a><sup>1,2,*</sup>&nbsp
+  <a href="#">Xiangqi Jin</a><sup>2,*</sup>&nbsp
+  <a href="#">Ziming Wang</a><sup>2,3,*</sup>&nbsp
+  <a href="https://jize-w.github.io/">Jize Wang</a><sup>1</sup>&nbsp
+  <a href="#">Jiajun Zhang</a><sup>2</sup> <br>
+  <a href="https://likaixin2000.github.io/">Kaixin Li</a><sup>4</sup>&nbsp
+  <a href="#">Zichen Wen</a><sup>2</sup>&nbsp
+  <a href="https://www.microsoft.com/en-us/research/people/lzhong/">Zhong Li</a><sup>5</sup>&nbsp
+  <a href="https://conghui.github.io/">Conghui He</a><sup>6</sup>&nbsp
+  <a href="https://xuminghu.github.io/">Xuming Hu</a><sup>7</sup>&nbsp
+  <a href="http://www.zhanglinfeng.tech/">Linfeng Zhang</a><sup>1,2,✉</sup>
+</p>
+
+<p align="center">
+  <sup>1</sup>Shanghai Jiao Tong University &nbsp
+  <sup>2</sup>EPIC Lab, Shanghai Jiao Tong University &nbsp <br>
+  <sup>3</sup>Nanyang Technological University &nbsp
+  <sup>4</sup>National University of Singapore &nbsp <br>
+  <sup>5</sup>Microsoft Research Asia &nbsp
+  <sup>6</sup>Shanghai AI Laboratory &nbsp <br>
+  <sup>7</sup>Hong Kong University of Science and Technology (Guangzhou)
+</p>
+
+<p align="center">
+  *Equal contribution &nbsp
+  ✉Corresponding author &nbsp
+</p>
+
+<p align="center">
+  Emails: <a href="mailto:shaobowang1009@sjtu.edu.cn">shaobowang1009@sjtu.edu.cn</a> &nbsp
+  <a href="mailto:zhanglinfeng@sjtu.edu.cn">zhanglinfeng@sjtu.edu.cn</a>
+</p>
+
+<p align="center">
+
+  <span style="background-color:black; color:white; padding:6px 16px; border-radius:999px; margin:4px; display:inline-block;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg" alt="PDF" width="16" style="vertical-align:middle; margin-right:6px;">
+    <a href="https://arxiv.org/pdf/2505.12212" style="color:white; text-decoration:none;">Paper</a>
+  </span>
+
+  <span style="background-color:black; color:white; padding:6px 16px; border-radius:999px; margin:4px; display:inline-block;">
+    <img src="./figs/arxiv-logomark-small.svg" alt="arXiv" width="16" style="vertical-align:middle; margin-right:6px;">
+    <a href="https://arxiv.org/abs/2505.12212" style="color:white; text-decoration:none;">arXiv</a>
+  </span>
+
+  <span style="background-color:black; color:white; padding:6px 16px; border-radius:999px; margin:4px; display:inline-block;">
+    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg" alt="GitHub" width="16" style="vertical-align:middle; margin-right:6px; filter:invert(1);">
+    <a href="https://github.com/gszfwsb/Data-Whisperer" style="color:white; text-decoration:none;">GitHub</a>
+  </span>
+
+</p>
+
+<br><br>
+
+<img width="825" alt="image" src="https://github.com/user-attachments/assets/37b5958f-1c55-447a-ae54-05f30b7bc224" />
+
+(I) **Few-shot In-Context Learning.**   
+A set of demonstration and query examples is randomly sampled from the initial dataset, and an ICL prompt is constructed with a fixed instruction. The LLM to be fine-tuned generates answers for all query examples, and the average evaluation score is computed using the ground truth answers.   
+(II) **Context-Aware Weighting.**   
+During each iteration of few-shot ICL, we weight the scores of the demonstration examples based on their attention scores, which quantify their influence on the queries.
+
+<center><h2>Takeaways</h2></center>
+
+<div style="background-color: #f6fbf6; padding: 20px; border-radius: 12px; max-width: 800px; margin: auto;">
+  
+  <!-- 编号项 1 -->
+  <div style="display: flex; align-items: center; margin-bottom: 16px;">
+    <!-- 编号 -->
+    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
+      1
+    </div>
+    <!-- 箭头 -->
+    <div style="margin: 0 12px; flex-shrink: 0;">
+      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <!-- 文字内容 -->
+    <div style="font-size: 16px; line-height: 1.5;">
+      <strong>Selection-to-Tuning Ratio.</strong> We critically examine existing data selection approaches and introduce the Selection-to-Tuning Ratio, a novel metric that quantifies the efficiency of these methods. We observed that all prior data selection methods are more inefficient than finetuning the LLM with the entire dataset.
+    </div>
+  </div>
+
+  <!-- 编号项 2 -->
+  <div style="display: flex; align-items: center; margin-bottom: 16px;">
+    <!-- 编号 -->
+    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
+      2
+    </div>
+    <!-- 箭头 -->
+    <div style="margin: 0 12px; flex-shrink: 0;">
+      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <!-- 文字内容 -->
+    <div style="font-size: 16px; line-height: 1.5;">
+      <strong>Data Whisperer.</strong> We propose Data Whisperer, an effective, training-free and attention-based method. Unlike previous approaches, our method eliminates the need to fine-tune a separate scoring model on the target dataset, ensuring greater efficiency.
+    </div>
+  </div>
+
+  <!-- 编号项 3 -->
+  <div style="display: flex; align-items: center; margin-bottom: 16px;">
+    <!-- 编号 -->
+    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
+      3
+    </div>
+    <!-- 箭头 -->
+    <div style="margin: 0 12px; flex-shrink: 0;">
+      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <!-- 文字内容 -->
+    <div style="font-size: 16px; line-height: 1.5;">
+      <strong>Compatibility with Weak-to-Strong Few-shot ICL.</strong> Data Whisperer integrates seamlessly with weak-to-strong few-shot ICL schemes, enabling effective performance even when a weaker model within the same model family is employed for ICL. This enhances both the scalability and efficiency of our method.
+    </div>
+  </div>
+
+  <!-- 编号项 4 -->
+  <div style="display: flex; align-items: center; margin-bottom: 16px;">
+    <!-- 编号 -->
+    <div style="background-color: #276f1f; color: white; width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; flex-shrink: 0;">
+      4
+    </div>
+    <!-- 箭头 -->
+    <div style="margin: 0 12px; flex-shrink: 0;">
+      <svg width="24" height="24" fill="#276f1f" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L11.586 9 7.293 4.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <!-- 文字内容 -->
+    <div style="font-size: 16px; line-height: 1.5;">
+      <strong>Experimental Validation.</strong> Comprehensive experiments are conducted on both real and synthetic datasets across various selection budget ratios, including BioInstruct, DialogSum, and GSM8K. We observe that Data Whisperer consistently outperforms previous SOTA methods, particularly in smaller data scenarios, while achieving faster selection times.
+    </div>
+  </div>
+
+</div>
+
+<center><h2>Selection-to-Tuning Ratio</h2></center>
+
+We first critically reevaluate the effectiveness of existing selection methods. To quantitatively and fairly assess the effectiveness of each method, we introduce the $\textit{Selection-to-Tuning Ratio}$ (STR), which is defined as the ratio of time spent on selection to the time required for fine-tuning the model on the entire dataset. Formally, let $t_p(\tau,\rho)$ represent the time associated with a selection method $\tau$ with a budget subset ratio $\rho$, and let $t_{ft}$ denote the corresponding fine-tuning time for the entire dataset. The STR is given by:
+
+$$
+  \text{STR}(\tau) = \frac{t_p(\tau,\rho)}{t_{ft}}.
+$$
+
+<img src="./figs/performance_time.png" alt="performance_time" style="display:block; margin:0 auto;" width=400px /> <br>
+
+<img src="./figs/str.png" alt="str" style="display:block; margin:0 auto;" />
+
+<center><h2>Experimental Validation</h2></center>
+
+Compared to SOTA methods, Data Whisperer demonstrates consistent superiority across varying dataset sizes. On real datasets, as illustrated in Table 2, Data Whisperer achieves higher accuracy. For instance, on 10% data of DialogSum with Qwen-2.5-7B-Instruct, Data Whisperer attains an accuracy of 43.00, surpassing the previous SOTA method, STAFF, by a significant margin of 2.46.
+
+<img src="./figs/real.png" alt="real" style="display:block; margin:0 auto;" /> <br>
+
+Similarly, on synthetic datasets, as shown in Table 3, Data Whisperer consistently delivers the best performance across all evaluated models and data proportions, underscoring its robust generalization capabilities. Notably, with the Qwen-2.5-7B-Instruct model on 5% of the data, Data Whisperer achieves an accuracy of 31.27, outperforming the prior SOTA method, Nuggets, by a remarkable 2.87 points.
+
+<img src="./figs/synthetic.png" alt="synthetic" style="display:block; margin:0 auto;" />
+
+<center><h2>Compatibility with Weak-to-Strong Few-shot ICL</h2></center>
+
+We also investigated the impact of weak-to-strong scoring, where a weaker model is used to select data for fine-tuning a stronger model. As shown in Figure 3, results indicate that using a weaker model does not significantly impact the overall performance of Data Whisperer, while providing a more efficient solution with a lower STR. It demonstrates that Data Whisperer is scalable across different model sizes and highlights its potential for efficient fine-tuning, even with limited computational resources.
+
+<img src="./figs/w2s.png" alt="w2s" style="display:block; margin:0 auto;" width=400px />
+
+<center><h2>Discussions</h2></center>
+
+1. Low-perplexity majority samples (i.e., easy examples) may play a key role in explaining why SFT improves task performance in low-data regimes.
+2. Unlike general pretraining, task-specific fine-tuning aims to extract and refine task-relevant patterns. Consequently, SFT-selected subsets tend to consist of a mix skewed toward low-perplexity, high-confidence tokens, whereas the full dataset includes both predictable and ambiguous examples.
+3. In SFT, data selection may be biased, as it favors easier samples with low token entropy. In contrast, training on more diverse or challenging samples might enhance generalization but risks instability when data is scarce. Thus, selecting easy data effectively promotes alignment with task objectives in high-confidence regions of the data distribution.
+
+<center><h2>BibTeX</h2></center>
+
+```latex
+@article{wang2025datawhisperer,
+  title = {Data Whisperer: Efficient Data Selection for Task-Specific LLM Fine-Tuning via Few-Shot In-Context Learning},
+  author = {Wang, Shaobo and Jin, Xiangqi and Wang, Ziming and Wang, Jize and Zhang, Jiajun and Li, Kaixin and Wen, Zichen and Li, Zhong and He, Conghui and Hu, Xuming and Zhang, Linfeng},
+  year = {2025},
+  journal = {Annual Meeting of the Association for Computational Linguistics},
+}
+```
