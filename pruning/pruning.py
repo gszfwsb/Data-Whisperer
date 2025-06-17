@@ -1,6 +1,7 @@
 from datawhisperer_bioinstruct_pruner import DataWhisperer_BioInstruct_Pruner
 from datawhisperer_dialog_pruner import DataWhisperer_Dialog_Pruner
 from datawhisperer_gsm_pruner import DataWhisperer_GSM_Pruner
+from datawhisperer_qwen2_5_vl_pruner import DataWhisperer_Qwen2_5VL_Pruner
 import argparse
 import time
 import torch
@@ -13,6 +14,7 @@ def get_pruner(dataset, method='datawhisperer'):
             "bioinstruct": DataWhisperer_BioInstruct_Pruner,
             "dialogsum": DataWhisperer_Dialog_Pruner,
             "gsm8k": DataWhisperer_GSM_Pruner,
+            "llava_1k": DataWhisperer_Qwen2_5VL_Pruner,
         }
     return pruner_map.get(dataset)
 
@@ -31,6 +33,12 @@ def run_pruning(args):
     pruner.do_pruning()
 
 if __name__ == "__main__":
+    import debugpy
+    debugpy.listen(5678)
+    print("Waiting for debugger attach...")
+    debugpy.wait_for_client()
+
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True, help="Path to the pretrained model")
     parser.add_argument("--model_type", type=str, default='llama3_8b')
