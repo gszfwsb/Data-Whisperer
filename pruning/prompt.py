@@ -415,7 +415,7 @@ A chat between a curious user and an artificial intelligence assistant. The assi
 Below are some demonstrations of how to format your answers:\n"""
     ),
     (
-"""\n**Strictly use the format specified below to answer all the questions:**\n\
+"""**Strictly use the format specified below to answer all the questions:**\n\
 
 Question i: <your answer>
 
