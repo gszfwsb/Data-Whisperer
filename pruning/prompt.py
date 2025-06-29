@@ -20,7 +20,7 @@ You are a medical expert. Given an input and an instruction, your objective is t
 3. **Stay within the scope of the question.** Avoid additional commentary or unrelated details.\n\
 Please respond to the questions based on the given instructions and demonstrations below.\n\
 <|eot_id|><|start_header_id|>user<|end_header_id|>\n\
-Below are some demonstrations of how to format your answers:\n"""
+Below are some demonstrations of how to format your answers:\n\n"""
     ),
 
     (
@@ -415,18 +415,14 @@ A chat between a curious user and an artificial intelligence assistant. The assi
 Below are some demonstrations of how to format your answers:\n"""
     ),
     (
-"""\n**Strictly use the format specified below:**\n\
+"""\n**Strictly use the format specified below to answer all the questions:**\n\
 
-Question 1 Answer: <your answer>\n\
-#### <final answer>\n\
-Question 2 Answer: <your answer>\n\
-#### <final answer>\n\
-...
+Question i: <your answer>
 
-### Now, based on the provided questions, respond to the following questions:\n"""
+### Now, based on the provided questions, respond to the following questions one by one:\n"""
     ),
 
-    ("""<|im_end|>\n\n<|im_start|>assistant"""),
+    ("""<|im_end|>\n\n<|im_start|>assistant\n"""),
 )
 
 if __name__ == "__main__":

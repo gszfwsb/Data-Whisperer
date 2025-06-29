@@ -53,24 +53,25 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         return demonstrations, demo_list
 
     def extract_predictions(self, responses_section):
-        # This method can be reused from other pruners if the output format is similar.
-        # TODO: need to confirm the output format
+        """
+        Extracts answers in the format:
+        Question i: <answer text>
+        If no such formatted answers are found, returns the entire response.
+        """
         predictions = []
         pattern_qa = (
-            r"\s*\*{0,2}"
-            r"Question\s+\d+\s+Answer"
-            r":?\*{0,2}"
-            r"\s*"
-            r"(.*?)"
-            r"(?=(?:\s*\n\s*\*{0,2}Question\s+\d+\s+Answer:?\*{0,2}\s*)|$)"
+            r"Question\s+(\d+):\s*"   # Question number and colon
+            r"(.*?)"                  # Non-greedy match for answer
+            r"(?=\n\s*\n|$)"          # Until the next blank line or end of text
         )
+
         matches_qa = re.findall(pattern_qa, responses_section, re.DOTALL | re.IGNORECASE)
+
         if matches_qa:
-            predictions.extend([match.strip() for match in matches_qa])
-            return predictions
-        # Fallback for single response
-        if not predictions:
-            return [responses_section.strip()]
+            predictions.extend(answer.strip() for _, answer in matches_qa)
+        else:
+            predictions.append(responses_section.strip())
+
         return predictions
 
     def visualize_causal_mask(self, causal_mask, save_path=None, max_size=512):
@@ -230,7 +231,6 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     truncation=False,
                     padding="longest",
                     max_length=self.args.max_token,
-                    # pad_to_multiple_of=8
                 ).to(self.accelerator.device)
                 n_d_text = self.processor(
                     text=demo,
@@ -239,7 +239,6 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     truncation=False,
                     padding="longest",
                     max_length=self.args.max_token,
-                    # pad_to_multiple_of=8
                 ).to(self.accelerator.device)
                 n_r_text = self.processor(
                     text=response,
@@ -248,7 +247,6 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     truncation=False,
                     padding="longest",
                     max_length=self.args.max_token,
-                    # pad_to_multiple_of=8
                 ).to(self.accelerator.device)
                 n_i = n_i_text.input_ids.size(1)
                 n_d = n_d_text.input_ids.size(1)
@@ -257,7 +255,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                 # Recalculate demo_len for each demonstration, including image tokens
                 demo_len = []
                 image_ptr = inst_imgs_num
-                for _demo_text, _demo_img_path in demo_list:
+                for _demo_text, _ in demo_list:
                     image_cnt = _demo_text.count(IMAGE_TOKEN)
                     _demo_len = self.processor(
                         text=_demo_text,
@@ -266,7 +264,6 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                         truncation=False,
                         padding="longest",
                         max_length=self.args.max_token,
-                        # pad_to_multiple_of=8
                     ).to(self.accelerator.device)
                     image_ptr += image_cnt
                     demo_len.append(_demo_len.input_ids.size(1))
@@ -293,6 +290,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     single_demo_to_response = demo_to_response[
                         :, demo_idx : demo_idx + demo_len[i]
                     ]
+
                     # Normalize by the area of the attention slice
                     norm_factor = (demo_len[i] * n_r) # divide by the rectangle area on the attention map (the Fig. 2 in the paper)
                     if norm_factor > 0:
