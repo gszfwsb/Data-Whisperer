@@ -295,7 +295,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                         :, demo_idx : demo_idx + demo_len[i]
                     ]
                     # Normalize by the area of the attention slice
-                    norm_factor = (demo_len[i] * n_r) # Benhao: is this correct?
+                    norm_factor = (demo_len[i] * n_r) # divide by the rectangle area on the attention map (the Fig. 2 in the paper)
                     if norm_factor > 0:
                         demo_attn.append(single_demo_to_response.sum() / norm_factor)
                     else:
