@@ -157,7 +157,6 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                 truncation=False,
                 padding="longest",
                 max_length=self.args.max_token,
-                pad_to_multiple_of=8
             ).to(self.accelerator.device)
 
             prompt_length = encoding.input_ids.size(1)
@@ -177,7 +176,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                 max_new_tokens=max_new_tokens,
                 temperature=0,
                 do_sample=False,
-                pad_token_id=self.processor.tokenizer.eos_token_id,
+                pad_token_id=self.processor.tokenizer.eos_token_id, # 151645
                 output_attentions=return_attention_scores,
                 return_dict_in_generate=True,
             )

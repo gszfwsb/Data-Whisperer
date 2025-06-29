@@ -1,0 +1,8 @@
+compute_environment: LOCAL_MACHINE
+distributed_type: MULTI_GPU
+machine_rank: 0
+main_process_ip: 192.168.128.209
+main_process_port: 32343
+num_machines: 1
+mixed_precision: bf16
+num_processes: 1
