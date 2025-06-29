@@ -7,6 +7,8 @@ from PIL import Image
 import json
 from argparse import Namespace
 from tqdm.auto import tqdm
+import matplotlib.pyplot as plt
+import numpy as np
 
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
@@ -71,112 +73,57 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             return [responses_section.strip()]
         return predictions
 
-    def get_attn_score(self, input_ids, attention_mask, layer_index):
-        with torch.no_grad():
-            # For Qwen2.5-VL, the language model is under `language_model` attribute
-            language_model = self.model.language_model
-
-            # so here, if you decode the input_ids, it will be like:
-
-            """
-            ["<|im_start|>system\nA chat between a curious user and an artificial intelligence assistant. 
-            The assistant gives helpful, detailed, and polite answers to the user's questions.
-            <|im_end|>
-            <|im_start|>user
-            Below are some demonstrations of how to format your answers:
-            nQuestion: What kind of bed is in the image?
-            Image: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>\n\nAnswer: The image shows a set of wooden bunk beds, which is a double-story bed with one bed stacked on top of the other. 
+    def visualize_causal_mask(self, causal_mask, save_path=None, max_size=512):
+        """
+        Visualize the causal attention mask
+        
+        Args:
+            causal_mask: torch.Tensor of shape [batch, heads, seq_len, seq_len] or [batch, 1, seq_len, seq_len]
+            save_path: Optional path to save the visualization
+            max_size: Maximum size for visualization (to avoid memory issues with large sequences)
+        """
+        # Convert to numpy and handle the tensor shape
+        if isinstance(causal_mask, torch.Tensor):
+            mask = causal_mask.detach().cpu().numpy()
+        else:
+            mask = causal_mask
             
-            Question: Why might the dog be in the car?\nImage: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>
+        # Take the first batch and first head if multiple dimensions
+        if mask.ndim == 4:
+            mask = mask[0, 0]  # [seq_len, seq_len]
+        elif mask.ndim == 3:
+            mask = mask[0]     # [seq_len, seq_len]
             
-            Answer: The dog might be in the car for various reasons, such as accompanying its owner on a trip or running errands, going to a veterinary clinic for a check-up, or visiting a park for recreational activities like playing or walking. It is not unusual for dog owners to bring their pets along with them in their vehicles, as this allows the dog to experience different environments and social interactions, while also giving the owner and their dog companionship during journeys. Additionally, having the dog in the car ensures that it is not left unattended at home for long periods, which can potentially lead to boredom, anxiety, or destructive behaviors. 
+        seq_len = mask.shape[0]
+        
+        # Subsample if the sequence is too long for visualization
+        if seq_len > max_size:
+            step = seq_len // max_size
+            mask = mask[::step, ::step]
+            seq_len = mask.shape[0]
             
-            Question: Describe the following image.\nImage: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>
+        # Convert large negative values to 0 (masked) and 0 to 1 (visible)
+        # The mask uses -inf (or very large negative values) for masked positions
+        binary_mask = np.where(mask < -1e10, 0, 1)
+        
+        plt.figure(figsize=(10, 10))
+        plt.imshow(binary_mask, cmap='Blues', origin='upper')
+        plt.title(f'Causal Attention Mask Visualization\n(Sequence Length: {seq_len})')
+        plt.xlabel('Key Position')
+        plt.ylabel('Query Position')
+        plt.colorbar(label='Attention Allowed (1=Yes, 0=No)')
+        
+        # Add grid for better readability
+        if seq_len <= 100:
+            plt.grid(True, alpha=0.3)
             
-            Answer: The image features a man sitting at a table at an outdoor restaurant, ready to enjoy his meal. In front of him is a plate of pizza, and he has a knife in his hand to cut it. There are multiple chairs and dining tables surrounding him, creating a dining area with ample seating options.\n\nSeveral cups can be seen placed on the tables nearby, indicating that beverages are available to accompany the meals. In addition to the man's knife, there is a fork visible on another table. The overall scene conveys a welcoming atmosphere for diners to enjoy their food and beverages. 
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+            print(f"Causal mask visualization saved to: {save_path}")
+        else:
+            plt.show()
             
-            Question: What can be inferred about the person's eating habits or dietary preferences from this image?\nImage: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>
-            
-            Answer: From the image showing a spoonful of rice with two pieces of broccoli, it can be inferred that the person might have a preference for a balanced diet. Rice provides carbohydrates, while broccoli is rich in vitamins, minerals, and fiber. This combination suggests that they might be trying to meet different nutritional requirements by consuming a mix of whole grains and vegetables. However, it is worth noting that this is just a snapshot and not a comprehensive view of the person's eating habits or dietary preferences. 
-            
-            Question: How many horses are there in the image?\nImage: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>
-            
-            Answer: There are three horses in the image. 
-            
-            **Strictly use the format specified below:**
-            
-            Question 1 Answer: <your answer>
-            #### <final answer>
-            Question 2 Answer: <your answer>
-            #### <final answer> 
-            
-            Now, based on the provided questions, respond to the following questions:
-            
-            Question 1: How many people are there in the image, and what are they doing?
-            Image: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>
-            
-            Question 2: What factors may influence the woman's success in flying the kite?
-            Image: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>
-            
-            Question 3: What factors could influence the woman's ability to catch the Frisbee?
-            Image: <|vision_start|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|image_pad|><|vision_end|>\n<|im_end|>\n\n<|im_start|>assistant<|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|><|endoftext|>"]
-
-            
-            """
-            
-            input_embeds = language_model.embed_tokens(input_ids)
-
-            # input_embeds.shape: torch.Size([1, 1712, 2048])
-            cache_position = torch.arange(
-                0, input_embeds.shape[1], device=input_embeds.device
-            )
-            # Manually set position_ids
-            # TODO: verify the correctness of position_ids for Qwen2.5-VL
-            position_ids = cache_position.view(1, -1).expand(input_ids.shape[0], -1)
-            position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-
-            # Here we need to handle the position ids for images correctly
-
-            # Prepare 4D causal mask
-            causal_mask = language_model._update_causal_mask(
-                attention_mask,
-                input_embeds,
-                cache_position,
-                None,
-                output_attentions=True
-            )
-
-            hidden_states = input_embeds
-            position_embeddings = language_model.rotary_emb(hidden_states, position_ids)
-            attention = None
-
-            for i, layer in enumerate(language_model.layers):
-                if i == layer_index:
-                    # Run forward pass for this layer only(including attention mechanism)
-                    layer_output = layer(
-                        hidden_states,
-                        attention_mask=causal_mask,
-                        position_ids=position_ids,
-                        output_attentions=True,
-                        use_cache=False,
-                        cache_position=cache_position,
-                        position_embeddings=position_embeddings,
-                    )
-                        
-                    attention = torch.sum(layer_output[1], dim=1).to(dtype=torch.float16)
-                    break
-                else:
-                    hidden_states = layer(
-                        hidden_states,
-                        attention_mask=causal_mask,
-                        position_ids=position_ids,
-                        output_attentions=False,
-                        use_cache=False,
-                        cache_position=cache_position,
-                        position_embeddings=position_embeddings,
-                    )[0]
-
-        return attention  # [B, L, L]
+        plt.close()
 
     def predict_batch(
         self,
@@ -218,104 +165,123 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             
             if max_new_tokens <= 0:
                 self.accelerator.print(f"{max_new_tokens}:max_new_tokens<0", flush=True)
-                return [
-                    [""] * len(val_samples) for val_samples in batch_val_samples
-                ]  # Empty predictions for each batch
+                # Return empty predictions and attention scores if applicable
+                empty_preds = [[""] * len(val_samples) for val_samples in batch_val_samples]
+                if return_attention_scores:
+                    return empty_preds, [[] for _ in batch_val_samples]
+                return empty_preds
+
+            # Single generate call to get both sequences and attentions
             outputs = self.model.generate(
                 **encoding,
                 max_new_tokens=max_new_tokens,
                 temperature=0,
                 do_sample=False,
                 pad_token_id=self.processor.tokenizer.eos_token_id,
+                output_attentions=return_attention_scores,
+                return_dict_in_generate=True,
             )
+            
         # Decode batch outputs
-        generated_texts = self.processor.batch_decode(outputs, skip_special_tokens=True)
+        # The generated sequences are the part of the output after the prompt
+        generated_sequences = outputs.sequences[:, prompt_length:]
+        generated_texts = self.processor.batch_decode(generated_sequences, skip_special_tokens=True)
+
         # Extract predictions for each batch
         batch_predictions = []
-        for generated_text, val_samples in zip(generated_texts, batch_val_samples):
-            # print(generated_text)
-            responses_section = generated_text.split("assistant")[-1].strip()
-            # print(f"responses_section: {responses_section}")
+        for generated_text in generated_texts:
+            # The generated text is already the response, no need to split by "assistant"
+            responses_section = generated_text.strip()
             predictions = self.extract_predictions(responses_section)
             batch_predictions.append(predictions)
 
         if return_attention_scores:
-            # Get attention scores from the model
             if self.args.attn_layer is not None:
                 layer = self.args.attn_layer
             else:
-                layer = 11 # TODO: choose correct layer? 
+                layer = -1 # Default to the last layer
+
+            prompt_attentions = outputs.attentions[0] # corresponding to the first generated token
+
+            # prompt_attentions is a tuple with length of num_layers
+            # each element is a tensor with shape (batch_size, num_heads, seq_len, seq_len)
+            
+            # Select the specified layer and sum over the heads
+            attn_score = torch.sum(prompt_attentions[layer], dim=1).to(dtype=torch.float16) # (batch_size, seq_len, seq_len)
 
             attn_layer = []
-            # encoding["pixel_values"].shape = ([4200, 1176])
-            attn_score = self.get_attn_score(
-                input_ids=encoding.input_ids,
-                attention_mask=encoding.attention_mask,
-                layer_index=layer,
-            )
-
+            IMAGE_TOKEN = "<|image_pad|>"
             for idx in range(len(prompts_comp)):  # batch_size_parallel
                 inst, demo, response = prompts_comp[idx]
+                images = batch_images[idx]
+                inst_imgs_num = inst.count(IMAGE_TOKEN)
+                demo_imgs_num = demo.count(IMAGE_TOKEN)
+                response_imgs_num = response.count(IMAGE_TOKEN)
+
                 if not inst and not demo and not response: # Skip failed samples
                     attn_layer.append([])
                     continue
                 
                 demo_list = batch_demo_list[idx]
-                
-                # TODO: verify the correctness of the following code, whether they are producing correct attention scores
-                # Correctly calculate token lengths including image patches
-                vision_config = self.model.config.vision_config
-                image_size = self.processor.image_processor.size["height"]
-                patch_size = vision_config.patch_size
-                num_tokens_per_image = (image_size // patch_size) ** 2
 
-                # Number of images in demo and response parts
-                num_demo_images = len([d for d in demo_list if d[1] is not None])
-                num_val_images = len(batch_val_samples[idx])
-
-                # Calculate text token lengths from components, ignoring special tokens.
-                # This is an approximation, as the final prompt construction by the
-                # processor might add its own template tokens.
-                n_i_text = len(self.processor.tokenizer.encode(inst, add_special_tokens=False))
-                n_d_text = len(self.processor.tokenizer.encode(demo, add_special_tokens=False))
-                n_r_text = len(self.processor.tokenizer.encode(response, add_special_tokens=False))
-                
-                # Total lengths including image patches
-                n_i = n_i_text
-                n_d = n_d_text + num_demo_images * num_tokens_per_image
-                n_r = n_r_text + num_val_images * num_tokens_per_image
+                n_i_text = self.processor(
+                    text=inst,
+                    images=images[:inst_imgs_num],
+                    return_tensors="pt",
+                    truncation=False,
+                    padding="longest",
+                    max_length=self.args.max_token,
+                    # pad_to_multiple_of=8
+                ).to(self.accelerator.device)
+                n_d_text = self.processor(
+                    text=demo,
+                    images=images[inst_imgs_num:inst_imgs_num+demo_imgs_num],
+                    return_tensors="pt",
+                    truncation=False,
+                    padding="longest",
+                    max_length=self.args.max_token,
+                    # pad_to_multiple_of=8
+                ).to(self.accelerator.device)
+                n_r_text = self.processor(
+                    text=response,
+                    images=images[inst_imgs_num+demo_imgs_num:inst_imgs_num+demo_imgs_num+response_imgs_num],
+                    return_tensors="pt",
+                    truncation=False,
+                    padding="longest",
+                    max_length=self.args.max_token,
+                    # pad_to_multiple_of=8
+                ).to(self.accelerator.device)
+                n_i = n_i_text.input_ids.size(1)
+                n_d = n_d_text.input_ids.size(1)
+                n_r = n_r_text.input_ids.size(1)
 
                 # Recalculate demo_len for each demonstration, including image tokens
                 demo_len = []
+                image_ptr = inst_imgs_num
                 for _demo_text, _demo_img_path in demo_list:
-                    text_len = len(self.processor.tokenizer.encode(_demo_text, add_special_tokens=False))
-                    image_len = num_tokens_per_image if _demo_img_path is not None else 0
-                    demo_len.append(text_len + image_len)
+                    image_cnt = _demo_text.count(IMAGE_TOKEN)
+                    _demo_len = self.processor(
+                        text=_demo_text,
+                        images=images[image_ptr:image_ptr+image_cnt],
+                        return_tensors="pt",
+                        truncation=False,
+                        padding="longest",
+                        max_length=self.args.max_token,
+                        # pad_to_multiple_of=8
+                    ).to(self.accelerator.device)
+                    image_ptr += image_cnt
+                    demo_len.append(_demo_len.input_ids.size(1))
 
                 # The total length used for slicing should be based on actual tokenized length
-                # from the attention mask to be robust against padding.
+                # from the attention mask to be robust against right padding.
                 total_prompt_len = encoding.attention_mask[idx].sum().item()
                 
-                # Approximate start of the demo section for slicing
-                # The length of tokenized instruction part is the best guess for the start of demo section
-                start_of_demo_tokens = len(self.processor.tokenizer.encode(inst, add_special_tokens=False))
+                start_of_demo_tokens = n_i
                 end_of_demo_tokens = start_of_demo_tokens + n_d
 
-                try:
-                    # This logic correctly extracts the non-padded part of the attention matrix
-                    # for left-padded sequences.
-                    pad_pos = (
-                        torch.nonzero(1 - encoding.attention_mask[idx].squeeze())
-                        .squeeze()[-1]
-                        .item()
-                    )
-                    attn = attn_score[idx, pad_pos + 1 :, pad_pos + 1 :]
-                except:
-                    # This handles the case with no padding
-                    attn = attn_score[idx]
+                # Slice the attention matrix for the current example from the batch
+                attn = attn_score[idx, :total_prompt_len, :total_prompt_len]
 
-                # Slicing the attention matrix.
-                # `demo_to_response` means attention from response tokens (queries) to demo tokens (keys/values)
                 response_start_token = end_of_demo_tokens
                 response_end_token = response_start_token + n_r
                 demo_to_response = attn[
@@ -329,7 +295,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                         :, demo_idx : demo_idx + demo_len[i]
                     ]
                     # Normalize by the area of the attention slice
-                    norm_factor = (demo_len[i] * n_r)
+                    norm_factor = (demo_len[i] * n_r) # Benhao: is this correct?
                     if norm_factor > 0:
                         demo_attn.append(single_demo_to_response.sum() / norm_factor)
                     else:
@@ -598,6 +564,77 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         
         print(f"Evaluation for this fold completed.")
 
+def test_causal_mask_visualization():
+    """
+    Test function to verify the causal mask visualization functionality.
+    """
+    print("Testing causal mask visualization...")
+    
+    # Create a sample causal mask (similar to what you showed)
+    seq_len = 100
+    causal_mask = torch.zeros(1, 1, seq_len, seq_len, dtype=torch.bfloat16)
+    
+    # Fill the upper triangle with -inf (masked positions)
+    mask_value = -3.3895e+38
+    for i in range(seq_len):
+        for j in range(i+1, seq_len):
+            causal_mask[0, 0, i, j] = mask_value
+    
+    # Create a dummy pruner instance just for visualization
+    args = Namespace(
+        model_path="/obs/pretrained_models/Qwen/Qwen2.5-VL-3B-Instruct",
+        dataset="test",
+        model_type="qwen2_5_vl"
+    )
+    
+    # We'll create a minimal version without loading the full model
+    class DummyPruner:
+        def visualize_causal_mask(self, causal_mask, save_path=None, max_size=512):
+            # Same visualization code as in the main class
+            if isinstance(causal_mask, torch.Tensor):
+                mask = causal_mask.detach().cpu().numpy()
+            else:
+                mask = causal_mask
+                
+            if mask.ndim == 4:
+                mask = mask[0, 0]  # [seq_len, seq_len]
+            elif mask.ndim == 3:
+                mask = mask[0]     # [seq_len, seq_len]
+                
+            seq_len = mask.shape[0]
+            
+            if seq_len > max_size:
+                step = seq_len // max_size
+                mask = mask[::step, ::step]
+                seq_len = mask.shape[0]
+                
+            binary_mask = np.where(mask < -1e10, 0, 1)
+            
+            plt.figure(figsize=(10, 10))
+            plt.imshow(binary_mask, cmap='Blues', origin='upper')
+            plt.title(f'Causal Attention Mask Visualization\n(Sequence Length: {seq_len})')
+            plt.xlabel('Key Position')
+            plt.ylabel('Query Position')
+            plt.colorbar(label='Attention Allowed (1=Yes, 0=No)')
+            
+            if seq_len <= 100:
+                plt.grid(True, alpha=0.3)
+                
+            if save_path:
+                plt.savefig(save_path, dpi=150, bbox_inches='tight')
+                print(f"Causal mask visualization saved to: {save_path}")
+            else:
+                plt.show()
+                
+            plt.close()
+    
+    dummy_pruner = DummyPruner()
+    save_path = "./temp_test_output/causal_mask_test.png"
+    os.makedirs("./temp_test_output", exist_ok=True)
+    
+    dummy_pruner.visualize_causal_mask(causal_mask, save_path=save_path)
+    print("Causal mask visualization test completed!")
+
 def test_pruner():
     """
     Test function to verify the pruner's functionality on a small scale.
@@ -611,7 +648,12 @@ def test_pruner():
         metric='exact_match', 
         dataset="qwen2_5_vl_llava_1k_en", # For consistency, though not directly used in prompt creation now
         model_type="qwen2_5_vl",
-        k_folds=2
+        k_folds=2,
+        attn_layer=11,
+        max_token=2048,
+        batch_train=1,
+        batch_test=1,
+        parallel_batches=1
     )
     
     # Create output directory
@@ -642,4 +684,8 @@ def test_pruner():
 
 
 if __name__ == "__main__":
-    test_pruner() 
+    # Test the causal mask visualization first
+    test_causal_mask_visualization()
+    
+    # Then run the full pruner test if needed
+    # test_pruner() 
