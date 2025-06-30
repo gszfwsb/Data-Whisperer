@@ -301,38 +301,56 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         """
         Create a comprehensive attention visualization with boundaries and annotations.
         """
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(50, 100))  # Make it much larger
-        # Improve attention visualization - use log scale for better visibility of small values
-        attention_matrix_vis = attention_matrix.copy()
-        # Add small epsilon to avoid log(0) and apply log transformation
-        attention_matrix_vis = np.log(attention_matrix_vis + 1e-8)
+        fig, ax = plt.subplots(1, 1, figsize=(25, 25))  # Single large square plot
         
-        # Main attention heatmap with improved colormap
-        im1 = ax1.imshow(attention_matrix_vis, cmap='viridis', aspect='equal', origin='upper', 
-                        vmin=np.percentile(attention_matrix_vis, 20), 
-                        vmax=np.percentile(attention_matrix_vis, 80))
-        ax1.set_title(f'Layer {layer_idx} Attention Matrix (Log Scale)\n(Batch {batch_idx}, Seq Length: {seq_len})', fontsize=16)
-        ax1.set_xlabel('Key Position', fontsize=14)
-        ax1.set_ylabel('Query Position', fontsize=14)
+        # Use standard attention weights (no log transformation)
+        attention_matrix_vis = attention_matrix.copy()
+        
+        # Apply min-max normalization for better visualization (standard practice)
+        attention_min = np.percentile(attention_matrix_vis, 5)  # Use 5th percentile to avoid extreme outliers
+        attention_max = np.percentile(attention_matrix_vis, 95)  # Use 95th percentile
+        attention_matrix_vis = np.clip(attention_matrix_vis, attention_min, attention_max)
+        attention_matrix_vis = (attention_matrix_vis - attention_min) / (attention_max - attention_min)
+        
+        # Main attention heatmap with standard normalization
+        im = ax.imshow(attention_matrix_vis, cmap='viridis', aspect='equal', origin='upper', 
+                        vmin=0, vmax=1)
+        ax.set_title(f'Layer {layer_idx} Attention Matrix\n(Batch {batch_idx}, Seq Length: {seq_len})', fontsize=20)
+        ax.set_xlabel('Key Position', fontsize=16)
+        ax.set_ylabel('Query Position', fontsize=16)
         
         # Add colorbar for attention magnitude
-        cbar1 = plt.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
-        cbar1.set_label('Log Attention Score', rotation=270, labelpad=15, fontsize=12)
+        cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Attention Score (Normalized)', rotation=270, labelpad=15, fontsize=14)
         
-        # Add section separation lines
+        # Add main section separation lines
         colors = {'instruction': 'red', 'demonstration': 'orange', 'response': 'white'}
         for section, (start, end) in boundaries.items():
             if start < seq_len and start > 0:
                 # Vertical lines (key boundaries)
-                ax1.axvline(x=start, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+                ax.axvline(x=start, color=colors[section], linestyle='-', linewidth=4, alpha=0.9)
                 # Horizontal lines (query boundaries)  
-                ax1.axhline(y=start, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+                ax.axhline(y=start, color=colors[section], linestyle='-', linewidth=4, alpha=0.9)
             if end < seq_len:
-                ax1.axvline(x=end, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
-                ax1.axhline(y=end, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+                ax.axvline(x=end, color=colors[section], linestyle='-', linewidth=4, alpha=0.9)
+                ax.axhline(y=end, color=colors[section], linestyle='-', linewidth=4, alpha=0.9)
+        
+        # Add individual demo boundaries within demonstration section
+        demo_start = boundaries['demonstration'][0]
+        current_pos = demo_start
+        for i, (d_start, d_end) in enumerate(demo_boundaries):
+            if i > 0 and d_start < seq_len:  # Don't draw line at the very beginning
+                # Vertical and horizontal lines to separate each demo
+                ax.axvline(x=d_start, color='yellow', linestyle='--', linewidth=2, alpha=0.8)
+                ax.axhline(y=d_start, color='yellow', linestyle='--', linewidth=2, alpha=0.8)
+        
+        # Add response section subdivisions (if there are multiple responses)
+        response_start, response_end = boundaries['response']
+        # For now, we'll just mark the response section clearly
+        # If you have multiple response parts, we can add more subdivisions here
         
         # Add attention values on the heatmap with improved visibility
-        if seq_len <= 80:  # Increase the threshold for showing values
+        if seq_len <= 100:  # Increase the threshold since we have more space now
             for i in tqdm(range(min(seq_len, attention_matrix.shape[0])), total=min(seq_len, attention_matrix.shape[0]), desc="Adding attention values", leave=False):
                 for j in range(min(seq_len, attention_matrix.shape[1])):
                     value = attention_matrix[i, j]
@@ -347,72 +365,22 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                             text = f'{value:.1e}'
                         
                         # Use white text for better contrast on viridis colormap
-                        text_color = 'white' if attention_matrix_vis[i, j] > np.percentile(attention_matrix_vis, 50) else 'red'
-                        ax1.text(j, i, text, ha='center', va='center', 
-                                color=text_color, fontsize=10, fontweight='bold')
+                        text_color = 'white' if attention_matrix_vis[i, j] > 0.5 else 'red'
+                        ax.text(j, i, text, ha='center', va='center', 
+                                color=text_color, fontsize=12, fontweight='bold')
         
         # Add section braces on axes
-        self._add_section_braces(ax1, boundaries, seq_len)
+        self._add_section_braces(ax, boundaries, seq_len)
         
-        # Don't mark image token positions to preserve color visibility
-        
-        # Second subplot: Focus on response-to-demonstration attention with improved visualization
-        demo_start, demo_end = boundaries['demonstration']
-        response_start, response_end = boundaries['response']
-
-        print(f"response_start: {response_start}, response_end: {response_end}, demo_start: {demo_start}, demo_end: {demo_end}")
-        
-        if response_start < seq_len and demo_start < seq_len:
-            response_to_demo = attention_matrix[response_start:min(response_end, seq_len), 
-                                             demo_start:min(demo_end, seq_len)]
-            
-            # Apply same log transformation for consistency
-            response_to_demo_vis = np.log(response_to_demo + 1e-8)
-            
-            im2 = ax2.imshow(response_to_demo_vis, cmap='viridis', aspect='equal', origin='upper',
-                           vmin=np.percentile(response_to_demo_vis, 20),
-                           vmax=np.percentile(response_to_demo_vis, 80))
-            ax2.set_title(f'Layer {layer_idx}: Response→Demonstration Attention (Log Scale)\n(Response tokens attend to Demo tokens)', fontsize=16)
-            ax2.set_xlabel('Demonstration Token Position (relative)', fontsize=14)
-            ax2.set_ylabel('Response Token Position (relative)', fontsize=14)
-            
-            # Add colorbar
-            cbar2 = plt.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
-            cbar2.set_label('Log Attention Score', rotation=270, labelpad=15, fontsize=12)
-            
-            # Add attention values on the focused heatmap with improved visibility
-            if response_to_demo.shape[0] <= 50 and response_to_demo.shape[1] <= 50:  # Increase threshold
-                for i in tqdm(range(response_to_demo.shape[0]), total=response_to_demo.shape[0], desc="Adding attention values", leave=False):
-                    for j in range(response_to_demo.shape[1]):
-                        value = response_to_demo[i, j]
-                        # Only show values above threshold
-                        if value > 0.001:
-                            # Format to 2 significant digits
-                            if value >= 0.01:
-                                text = f'{value:.2f}'
-                            elif value >= 0.001:
-                                text = f'{value:.3f}'
-                            else:
-                                text = f'{value:.1e}'
-                            
-                            # Use adaptive text color for better contrast on viridis colormap
-                            text_color = 'white' if response_to_demo_vis[i, j] > np.percentile(response_to_demo_vis, 50) else 'red'
-                            ax2.text(j, i, text, ha='center', va='center', 
-                                    color=text_color, fontsize=10, fontweight='bold')
-            
-            # Draw individual demo boundaries in the focused view with better visibility
-            demo_offset = 0
-            for i, demo_length in enumerate([end - start for start, end in demo_boundaries]):
-                if demo_offset + demo_length <= response_to_demo.shape[1]:
-                    ax2.axvline(x=demo_offset, color='red', linestyle='-', linewidth=2, alpha=0.9)
-                    ax2.axvline(x=demo_offset + demo_length, color='red', linestyle='-', linewidth=2, alpha=0.9)
-                    
-                    # Add demo labels with better visibility
-                    if demo_length > 3:  # Lower threshold for labels
-                        ax2.text(demo_offset + demo_length/2, -3, f'Demo {i+1}', 
-                                ha='center', va='top', color='red', fontsize=14, fontweight='bold',
-                                bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8))
-                demo_offset += demo_length
+        # Add demo labels on the side
+        demo_start = boundaries['demonstration'][0]
+        for i, (d_start, d_end) in enumerate(demo_boundaries):
+            if d_start < seq_len:
+                mid_pos = (d_start + min(d_end, seq_len)) / 2
+                # Add demo label on the right side
+                ax.text(seq_len + seq_len * 0.02, mid_pos, f'Demo {i+1}', 
+                       ha='left', va='center', color='yellow', fontsize=14, fontweight='bold',
+                       bbox=dict(boxstyle="round,pad=0.3", facecolor='black', alpha=0.7))
         
         plt.tight_layout()
 
@@ -425,7 +393,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
         plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
-        
+
         print(f"save_path_pdf: {save_path_pdf}")
         # Create a summary statistics plot
         self._create_attention_statistics_plot(attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx)
@@ -433,20 +401,13 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
     
     def _create_attention_statistics_plot(self, attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx):
         """Create statistical analysis plots for attention patterns."""
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 16))
         
-        # 1. Attention distribution across sections
-        section_attention = {}
-        for section, (start, end) in boundaries.items():
-            end = min(end, attention_matrix.shape[0])
-            if start < attention_matrix.shape[0]:
-                section_scores = attention_matrix[start:end, :].mean(axis=0)
-                section_attention[section] = section_scores.mean()
+        # 1. Block-wise Attention Map (comprehensive section interactions)
+        self._create_blockwise_attention_map(attention_matrix, boundaries, demo_boundaries, ax1, layer_idx)
         
-        ax1.bar(section_attention.keys(), section_attention.values(), color=['red', 'blue', 'green'], alpha=0.7)
-        ax1.set_title(f'Layer {layer_idx}: Average Attention by Section')
-        ax1.set_ylabel('Average Attention Score')
-        ax1.tick_params(axis='x', rotation=45)
+        # Store the section patterns for debugging
+        section_patterns = self._calculate_section_patterns(attention_matrix, boundaries)
         
         # 2. Response attention to individual demonstrations
         response_start, response_end = boundaries['response']
@@ -456,33 +417,58 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             demo_attention_scores = []
             demo_labels = []
             
+            print(f"  Bar Plot Response→Demo Calculation (Raw Attention Scores):")
             for i, (d_start, d_end) in enumerate(demo_boundaries):
                 if d_end <= attention_matrix.shape[1]:
                     response_slice = attention_matrix[response_start:min(response_end, attention_matrix.shape[0]), d_start:d_end]
                     if response_slice.size > 0:
-                        demo_attention_scores.append(response_slice.mean())
+                        raw_score = response_slice.mean()
+                        demo_attention_scores.append(raw_score)
                         demo_labels.append(f'Demo {i+1}')
+                        print(f"    Demo {i+1}: {raw_score:.6f} (slice shape: {response_slice.shape})")
             
             if demo_attention_scores:
                 ax2.bar(demo_labels, demo_attention_scores, color='cyan', alpha=0.7)
-                ax2.set_title(f'Layer {layer_idx}: Response Attention to Each Demo')
-                ax2.set_ylabel('Average Attention Score')
+                ax2.set_title(f'Layer {layer_idx}: Response Attention to Each Demo\n(Raw Attention Scores)')
+                ax2.set_ylabel('Raw Average Attention Score')
                 ax2.tick_params(axis='x', rotation=45)
+                
+                # Add value labels on bars for better visibility
+                for i, (label, score) in enumerate(zip(demo_labels, demo_attention_scores)):
+                    ax2.text(i, score + max(demo_attention_scores) * 0.01, 
+                            f'{score:.4f}', ha='center', va='bottom', fontweight='bold')
         
-        # 3. Attention entropy across sequence positions
+        # 3. Attention entropy across sequence positions (corrected calculation)
         attention_entropy = []
+        max_entropy = np.log(attention_matrix.shape[1])  # Maximum possible entropy
+        
         for i in range(attention_matrix.shape[0]):
             row = attention_matrix[i, :]
+            
+            # Normalize the row to ensure it sums to 1 (like a probability distribution)
+            row_sum = row.sum()
+            if row_sum > 0:
+                row = row / row_sum
+            else:
+                row = np.ones_like(row) / len(row)  # Uniform distribution if all zeros
+            
             # Add small epsilon to avoid log(0)
             row = row + 1e-10
+            row = row / row.sum()  # Re-normalize after adding epsilon
+            
+            # Calculate entropy: H = -Σ(p_i * log(p_i))
             entropy = -np.sum(row * np.log(row))
             attention_entropy.append(entropy)
         
-        ax3.plot(attention_entropy, color='purple', linewidth=2)
-        ax3.set_title(f'Layer {layer_idx}: Attention Entropy by Position')
-        ax3.set_xlabel('Sequence Position')
-        ax3.set_ylabel('Attention Entropy')
+        ax3.plot(attention_entropy, color='purple', linewidth=2, label='Attention Entropy')
+        ax3.axhline(y=max_entropy, color='gray', linestyle=':', alpha=0.7, 
+                   label=f'Max Entropy ({max_entropy:.2f})')
+        ax3.set_title(f'Layer {layer_idx}: Attention Entropy by Position\n'
+                     f'(Low=Focused, High=Distributed)')
+        ax3.set_xlabel('Sequence Position (Query)')
+        ax3.set_ylabel('Attention Entropy (nats)')
         ax3.grid(True, alpha=0.3)
+        ax3.legend()
         
         # Add section boundaries to entropy plot
         colors = {'instruction': 'red', 'demonstration': 'blue', 'response': 'green'}
@@ -490,15 +476,62 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             ax3.axvline(x=start, color=colors[section], linestyle='--', alpha=0.7, label=f'{section.capitalize()}')
         ax3.legend()
         
-        # 4. Attention magnitude distribution
+        # 4. Attention magnitude distribution with statistics
         ax4.hist(attention_matrix.flatten(), bins=50, alpha=0.7, color='orange', edgecolor='black')
         ax4.set_title(f'Layer {layer_idx}: Attention Score Distribution')
         ax4.set_xlabel('Attention Score')
         ax4.set_ylabel('Frequency')
-        ax4.axvline(x=attention_matrix.mean(), color='red', linestyle='--', linewidth=2, label=f'Mean: {attention_matrix.mean():.4f}')
+        
+        # Add statistical lines
+        mean_val = attention_matrix.mean()
+        median_val = np.median(attention_matrix)
+        max_val = attention_matrix.max()
+        min_val = attention_matrix.min()
+        
+        ax4.axvline(x=mean_val, color='red', linestyle='--', linewidth=2, 
+                   label=f'Mean: {mean_val:.4f}')
+        ax4.axvline(x=median_val, color='blue', linestyle='--', linewidth=2, 
+                   label=f'Median: {median_val:.4f}')
+        ax4.axvline(x=max_val, color='green', linestyle='--', linewidth=2, 
+                   label=f'Max: {max_val:.4f}')
         ax4.legend()
         
         plt.tight_layout()
+        
+        # Print comprehensive debugging information
+        print(f"\n=== Layer {layer_idx} Block-wise Attention Analysis ===")
+        print(f"Attention matrix shape: {attention_matrix.shape}")
+        print(f"Attention range: [{min_val:.6f}, {max_val:.6f}]")
+        print(f"Mean attention: {mean_val:.6f}, Median: {median_val:.6f}")
+        
+        # Print section-level patterns
+        print(f"\nSection-Level Patterns:")
+        for pattern_type, values in section_patterns.items():
+            if values:
+                print(f"  {pattern_type}:")
+                for section, score in values.items():
+                    print(f"    {section}: {score:.6f}")
+        
+        # Print attention entropy analysis
+        print(f"\nAttention Entropy Analysis:")
+        print(f"  Average entropy: {np.mean(attention_entropy):.4f}")
+        print(f"  Max possible entropy: {max_entropy:.4f}")
+        print(f"  Entropy efficiency: {np.mean(attention_entropy)/max_entropy:.3f} (0=focused, 1=uniform)")
+        
+        # Find and report key attention patterns from block-wise map
+        print(f"\nKey Block-wise Attention Patterns:")
+        
+        # Analyze the block-wise attention patterns
+        try:
+            # Get the block attention data for analysis
+            block_attention_data = self._get_block_attention_for_analysis(attention_matrix, boundaries, demo_boundaries)
+            if block_attention_data is not None:
+                self._analyze_block_patterns(block_attention_data, boundaries, demo_boundaries, layer_idx)
+        except Exception as e:
+            print(f"  Could not analyze block patterns: {e}")
+        
+        print(f"  → See block-wise attention heatmap for visual analysis")
+        print("="*60)
         
         # Save the statistics plot as vector format (PDF) and high-res PNG
         save_path_pdf = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.pdf')
@@ -507,6 +540,298 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
         plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
+    
+    def _create_blockwise_attention_map(self, attention_matrix, boundaries, demo_boundaries, ax, layer_idx):
+        """
+        Create a detailed block-wise attention map showing all section interactions.
+        
+        This visualization provides a comprehensive view of how different parts of the input
+        attend to each other, going beyond simple section-level analysis.
+        
+        Features:
+        - Instruction block: Shows how instruction tokens interact
+        - Individual Demo blocks: Each demonstration is shown separately  
+        - Response parts: Long responses are subdivided for finer analysis
+        - Color-coded section indicators: Red=Instruction, Blue=Demo, Green=Response
+        - Diagonal elements: Self-attention within each block
+        - Off-diagonal elements: Cross-attention between different blocks
+        
+        Interpretation:
+        - High values on diagonal: Strong self-attention within sections
+        - High Response→Demo values: Response attending to demonstrations
+        - High Demo→Instruction values: Demos attending to instructions
+        - Cross-demo attention: How different demos interact with each other
+        
+        Args:
+            attention_matrix: The attention matrix to analyze [seq_len, seq_len]
+            boundaries: Section boundaries dict (instruction, demonstration, response)
+            demo_boundaries: List of individual demo boundaries
+            ax: Matplotlib axis to plot on
+            layer_idx: Current layer index for labeling
+        """
+        
+        # Create extended boundaries including individual demos and response parts
+        extended_boundaries = []
+        extended_labels = []
+        
+        # Add instruction
+        inst_start, inst_end = boundaries['instruction']
+        if inst_start < attention_matrix.shape[0]:
+            extended_boundaries.append((inst_start, min(inst_end, attention_matrix.shape[0])))
+            extended_labels.append('Instruction')
+        
+        # Add individual demos
+        demo_start, demo_end = boundaries['demonstration']
+        for i, (d_start, d_end) in enumerate(demo_boundaries):
+            if d_start < attention_matrix.shape[0]:
+                extended_boundaries.append((d_start, min(d_end, attention_matrix.shape[0])))
+                extended_labels.append(f'Demo {i+1}')
+        
+        # Add response as a single block
+        resp_start, resp_end = boundaries['response']
+        if resp_start < attention_matrix.shape[0]:
+            extended_boundaries.append((resp_start, min(resp_end, attention_matrix.shape[0])))
+            extended_labels.append('Response')
+        
+        # Create block-wise attention matrix
+        n_blocks = len(extended_boundaries)
+        block_attention = np.zeros((n_blocks, n_blocks))
+        
+        print(f"  Block-wise Attention Map Calculation (Raw Attention Scores):")
+        print(f"    Extended boundaries: {[(label, start, end) for label, (start, end) in zip(extended_labels, extended_boundaries)]}")
+        
+        for i, (query_start, query_end) in enumerate(extended_boundaries):
+            for j, (key_start, key_end) in enumerate(extended_boundaries):
+                if (query_end <= attention_matrix.shape[0] and 
+                    key_end <= attention_matrix.shape[1] and
+                    query_start < query_end and key_start < key_end):
+                    
+                    # Extract the block and calculate mean attention
+                    block = attention_matrix[query_start:query_end, key_start:key_end]
+                    if block.size > 0:
+                        raw_score = block.mean()
+                        block_attention[i, j] = raw_score
+                        
+                        # Debug Response→Demo specifically 
+                        if 'Response' in extended_labels[i] and 'Demo' in extended_labels[j]:
+                            print(f"    {extended_labels[i]} → {extended_labels[j]}: {raw_score:.6f} (block shape: {block.shape})")
+        
+        # Store raw block attention for later comparison
+        raw_block_attention = block_attention.copy()
+        
+        # Normalize the block attention for better visualization
+        if block_attention.max() > 0:
+            # Use log scale for better contrast if values span large range
+            min_val = block_attention[block_attention > 0].min() if np.any(block_attention > 0) else 0
+            max_val = block_attention.max()
+            if max_val / min_val > 10:  # If range spans more than 10x
+                # Use log scale with small offset to avoid log(0)
+                block_attention_vis = np.log(block_attention + min_val * 0.01)
+                vmin, vmax = np.log(min_val * 0.01), np.log(max_val + min_val * 0.01)
+            else:
+                block_attention_vis = block_attention
+                vmin, vmax = 0, max_val
+        else:
+            block_attention_vis = block_attention
+            vmin, vmax = 0, 1
+        
+        # Create heatmap with better colormap
+        im = ax.imshow(block_attention_vis, cmap='YlOrRd', aspect='equal', vmin=vmin, vmax=vmax)
+        
+        # Customize the plot
+        ax.set_title(f'Layer {layer_idx}: Block-wise Attention Map\n(Rows=Query, Cols=Key, Diagonal=Self-Attention)', 
+                    fontsize=13, fontweight='bold')
+        ax.set_xlabel('Key Sections (What is being attended to)', fontsize=11)
+        ax.set_ylabel('Query Sections (What is attending)', fontsize=11)
+        
+        # Set tick labels
+        ax.set_xticks(range(n_blocks))
+        ax.set_yticks(range(n_blocks))
+        ax.set_xticklabels(extended_labels, rotation=45, ha='right', fontsize=10)
+        ax.set_yticklabels(extended_labels, fontsize=10)
+        
+        # Add colorbar
+        cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Average Attention Score', rotation=270, labelpad=15, fontsize=10)
+        
+        # Add text annotations with attention values (RAW scores, not normalized)
+        for i in range(n_blocks):
+            for j in range(n_blocks):
+                # Use RAW block_attention values, NOT the normalized block_attention_vis
+                raw_value = raw_block_attention[i, j]  # Use the stored raw values
+                if raw_value > 0:  # Only show non-zero values
+                    # Use normalized value ONLY for determining text color, not for display
+                    normalized_value = (block_attention_vis[i, j] - vmin) / (vmax - vmin)
+                    text_color = 'white' if normalized_value > 0.5 else 'black'
+                    
+                    # Format value display - ALWAYS show RAW values
+                    if raw_value >= 0.001:
+                        text = f'{raw_value:.3f}'
+                    else:
+                        text = f'{raw_value:.1e}'
+                    
+                    ax.text(j, i, text, ha='center', va='center', 
+                           color=text_color, fontsize=9, fontweight='bold')
+                    
+                    # Debug Response→Demo text annotations specifically
+                    if 'Response' in extended_labels[i] and 'Demo' in extended_labels[j]:
+                        print(f"    Text annotation {extended_labels[i]} → {extended_labels[j]}: displaying {text} (raw: {raw_value:.6f})")
+        
+        # Add grid for better visualization
+        ax.set_xticks(np.arange(-0.5, n_blocks, 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, n_blocks, 1), minor=True)
+        ax.grid(which='minor', color='white', linestyle='-', linewidth=1, alpha=0.8)
+        
+        # Add section type indicators with color coding
+        section_colors = {'Instruction': 'red', 'Demo': 'blue', 'Response': 'green'}
+        for i, label in enumerate(extended_labels):
+            for section_type, color in section_colors.items():
+                if section_type in label:
+                    # Add colored indicators on the axes
+                    rect_x = plt.Rectangle((i-0.5, -0.5), 1, 0.3, facecolor=color, alpha=0.7)
+                    rect_y = plt.Rectangle((-0.5, i-0.5), 0.3, 1, facecolor=color, alpha=0.7)
+                    ax.add_patch(rect_x)
+                    ax.add_patch(rect_y)
+                    break
+    
+    def _calculate_section_patterns(self, attention_matrix, boundaries):
+        """Calculate various attention patterns for debugging."""
+        section_patterns = {
+            'Self-Attention': {},      # Within-section attention
+            'Receiving Attention': {}, # How much attention each section receives from others
+            'Giving Attention': {}     # How much attention each section gives to others
+        }
+        
+        for section, (start, end) in boundaries.items():
+            end = min(end, attention_matrix.shape[0])
+            if start < attention_matrix.shape[0]:
+                # Self-attention within section (diagonal blocks)
+                if end <= attention_matrix.shape[1]:
+                    self_attn = attention_matrix[start:end, start:end].mean()
+                    section_patterns['Self-Attention'][section] = self_attn
+                
+                # How much attention this section receives (as keys)
+                if end <= attention_matrix.shape[1]:
+                    received_attn = attention_matrix[:, start:end].mean()
+                    section_patterns['Receiving Attention'][section] = received_attn
+                
+                # How much attention this section gives (as queries)
+                given_attn = attention_matrix[start:end, :].mean()
+                section_patterns['Giving Attention'][section] = given_attn
+        
+        return section_patterns
+    
+    def _get_block_attention_for_analysis(self, attention_matrix, boundaries, demo_boundaries):
+        """Extract block attention matrix for detailed analysis."""
+        try:
+            # Recreate the same logic as in _create_blockwise_attention_map
+            extended_boundaries = []
+            extended_labels = []
+            
+            # Add instruction
+            inst_start, inst_end = boundaries['instruction']
+            if inst_start < attention_matrix.shape[0]:
+                extended_boundaries.append((inst_start, min(inst_end, attention_matrix.shape[0])))
+                extended_labels.append('Instruction')
+            
+            # Add individual demos
+            for i, (d_start, d_end) in enumerate(demo_boundaries):
+                if d_start < attention_matrix.shape[0]:
+                    extended_boundaries.append((d_start, min(d_end, attention_matrix.shape[0])))
+                    extended_labels.append(f'Demo {i+1}')
+            
+            # Add response as a single block
+            resp_start, resp_end = boundaries['response']
+            if resp_start < attention_matrix.shape[0]:
+                extended_boundaries.append((resp_start, min(resp_end, attention_matrix.shape[0])))
+                extended_labels.append('Response')
+            
+            # Create block-wise attention matrix
+            n_blocks = len(extended_boundaries)
+            block_attention = np.zeros((n_blocks, n_blocks))
+            
+            for i, (query_start, query_end) in enumerate(extended_boundaries):
+                for j, (key_start, key_end) in enumerate(extended_boundaries):
+                    if (query_end <= attention_matrix.shape[0] and 
+                        key_end <= attention_matrix.shape[1] and
+                        query_start < query_end and key_start < key_end):
+                        
+                        block = attention_matrix[query_start:query_end, key_start:key_end]
+                        if block.size > 0:
+                            block_attention[i, j] = block.mean()
+            
+            return block_attention, extended_labels
+        except Exception as e:
+            print(f"Error creating block attention for analysis: {e}")
+            return None, None
+    
+    def _analyze_block_patterns(self, block_attention_tuple, boundaries, demo_boundaries, layer_idx):
+        """Analyze and report key patterns in the block attention matrix (RAW scores)."""
+        if block_attention_tuple is None:
+            return
+            
+        block_attention, extended_labels = block_attention_tuple
+        if block_attention is None or len(extended_labels) == 0:
+            return
+        
+        n_blocks = len(extended_labels)
+        
+        print(f"  Block Pattern Analysis (RAW Attention Scores):")
+        
+        # Find strongest self-attention blocks
+        self_attention_scores = []
+        for i in range(n_blocks):
+            self_attention_scores.append((block_attention[i, i], extended_labels[i]))
+        self_attention_scores.sort(reverse=True, key=lambda x: x[0])
+        
+        print(f"  Strongest Self-Attention (RAW scores):")
+        for score, label in self_attention_scores[:3]:  # Top 3
+            if score > 0:
+                print(f"    {label}: {score:.6f}")
+        
+        # Find strongest cross-attention patterns
+        cross_attention = []
+        for i in range(n_blocks):
+            for j in range(n_blocks):
+                if i != j and block_attention[i, j] > 0:  # Skip diagonal
+                    cross_attention.append((block_attention[i, j], f"{extended_labels[i]} → {extended_labels[j]}"))
+        
+        if cross_attention:
+            cross_attention.sort(reverse=True, key=lambda x: x[0])
+            print(f"  Strongest Cross-Attention (RAW scores):")
+            for score, pattern in cross_attention[:5]:  # Top 5
+                print(f"    {pattern}: {score:.6f}")
+        
+        # Analyze response attention patterns specifically
+        response_blocks = [i for i, label in enumerate(extended_labels) if 'Response' in label]
+        demo_blocks = [i for i, label in enumerate(extended_labels) if 'Demo' in label]
+        
+        if response_blocks and demo_blocks:
+            print(f"  Response → Demo Attention (RAW scores):")
+            for resp_idx in response_blocks:
+                resp_label = extended_labels[resp_idx]
+                demo_attentions = []
+                for demo_idx in demo_blocks:
+                    demo_label = extended_labels[demo_idx]
+                    raw_score = block_attention[resp_idx, demo_idx]
+                    if raw_score > 0:
+                        demo_attentions.append((raw_score, demo_label))
+                        print(f"    {resp_label} → {demo_label}: {raw_score:.6f}")
+                
+                if demo_attentions:
+                    demo_attentions.sort(reverse=True, key=lambda x: x[0])
+                    best_score, best_demo = demo_attentions[0]
+                    print(f"    → {resp_label} most attends to {best_demo}: {best_score:.6f}")
+        
+        # Calculate and report attention distribution metrics
+        total_attention = block_attention.sum()
+        if total_attention > 0:
+            diagonal_sum = np.trace(block_attention)
+            off_diagonal_sum = total_attention - diagonal_sum
+            
+            print(f"  Attention Distribution (RAW scores):")
+            print(f"    Self-attention (diagonal): {diagonal_sum/total_attention:.3f}")
+            print(f"    Cross-attention (off-diagonal): {off_diagonal_sum/total_attention:.3f}")
 
     def predict_batch(
         self,
