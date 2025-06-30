@@ -301,60 +301,43 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         """
         Create a comprehensive attention visualization with boundaries and annotations.
         """
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30, 15))  # Make it much larger
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(50, 100))  # Make it much larger
+        # Improve attention visualization - use log scale for better visibility of small values
+        attention_matrix_vis = attention_matrix.copy()
+        # Add small epsilon to avoid log(0) and apply log transformation
+        attention_matrix_vis = np.log(attention_matrix_vis + 1e-8)
         
-        # Main attention heatmap
-        im1 = ax1.imshow(attention_matrix, cmap='viridis', aspect='auto', origin='upper')
-        ax1.set_title(f'Layer {layer_idx} Attention Matrix\n(Batch {batch_idx}, Seq Length: {seq_len})', fontsize=16)
+        # Main attention heatmap with improved colormap
+        im1 = ax1.imshow(attention_matrix_vis, cmap='viridis', aspect='equal', origin='upper', 
+                        vmin=np.percentile(attention_matrix_vis, 20), 
+                        vmax=np.percentile(attention_matrix_vis, 80))
+        ax1.set_title(f'Layer {layer_idx} Attention Matrix (Log Scale)\n(Batch {batch_idx}, Seq Length: {seq_len})', fontsize=16)
         ax1.set_xlabel('Key Position', fontsize=14)
         ax1.set_ylabel('Query Position', fontsize=14)
         
         # Add colorbar for attention magnitude
         cbar1 = plt.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
-        cbar1.set_label('Attention Score', rotation=270, labelpad=15, fontsize=12)
+        cbar1.set_label('Log Attention Score', rotation=270, labelpad=15, fontsize=12)
         
-        # Add attention values on the heatmap (only for smaller matrices to avoid clutter)
-        if seq_len <= 50:  # Only show values for smaller matrices
-            for i in range(min(seq_len, attention_matrix.shape[0])):
+        # Add section separation lines
+        colors = {'instruction': 'red', 'demonstration': 'orange', 'response': 'white'}
+        for section, (start, end) in boundaries.items():
+            if start < seq_len and start > 0:
+                # Vertical lines (key boundaries)
+                ax1.axvline(x=start, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+                # Horizontal lines (query boundaries)  
+                ax1.axhline(y=start, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+            if end < seq_len:
+                ax1.axvline(x=end, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+                ax1.axhline(y=end, color=colors[section], linestyle='-', linewidth=3, alpha=0.9)
+        
+        # Add attention values on the heatmap with improved visibility
+        if seq_len <= 80:  # Increase the threshold for showing values
+            for i in tqdm(range(min(seq_len, attention_matrix.shape[0])), total=min(seq_len, attention_matrix.shape[0]), desc="Adding attention values", leave=False):
                 for j in range(min(seq_len, attention_matrix.shape[1])):
                     value = attention_matrix[i, j]
-                    # Format to 2 significant digits
-                    if value >= 0.01:
-                        text = f'{value:.2f}'
-                    elif value >= 0.001:
-                        text = f'{value:.3f}'
-                    else:
-                        text = f'{value:.1e}'
-                    ax1.text(j, i, text, ha='center', va='center', 
-                            color='red', fontsize=8, fontweight='bold')
-        
-        # Add section braces on axes
-        self._add_section_braces(ax1, boundaries, seq_len)
-        
-                 # Don't mark image token positions to preserve color visibility
-        
-        # Second subplot: Focus on response-to-demonstration attention
-        demo_start, demo_end = boundaries['demonstration']
-        response_start, response_end = boundaries['response']
-        
-        if response_start < seq_len and demo_start < seq_len:
-            response_to_demo = attention_matrix[response_start:min(response_end, seq_len), 
-                                             demo_start:min(demo_end, seq_len)]
-            
-            im2 = ax2.imshow(response_to_demo, cmap='plasma', aspect='auto', origin='upper')
-            ax2.set_title(f'Layer {layer_idx}: Response→Demonstration Attention\n(Response tokens attend to Demo tokens)', fontsize=16)
-            ax2.set_xlabel('Demonstration Token Position (relative)', fontsize=14)
-            ax2.set_ylabel('Response Token Position (relative)', fontsize=14)
-            
-            # Add colorbar
-            cbar2 = plt.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
-            cbar2.set_label('Attention Score', rotation=270, labelpad=15, fontsize=12)
-            
-            # Add attention values on the focused heatmap (if small enough)
-            if response_to_demo.shape[0] <= 30 and response_to_demo.shape[1] <= 30:
-                for i in range(response_to_demo.shape[0]):
-                    for j in range(response_to_demo.shape[1]):
-                        value = response_to_demo[i, j]
+                    # Only show values above a certain threshold to avoid clutter
+                    if value > 0.001:  # Only show meaningful attention values
                         # Format to 2 significant digits
                         if value >= 0.01:
                             text = f'{value:.2f}'
@@ -362,34 +345,91 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                             text = f'{value:.3f}'
                         else:
                             text = f'{value:.1e}'
-                        ax2.text(j, i, text, ha='center', va='center', 
-                                color='red', fontsize=8, fontweight='bold')
+                        
+                        # Use white text for better contrast on viridis colormap
+                        text_color = 'white' if attention_matrix_vis[i, j] > np.percentile(attention_matrix_vis, 50) else 'red'
+                        ax1.text(j, i, text, ha='center', va='center', 
+                                color=text_color, fontsize=10, fontweight='bold')
+        
+        # Add section braces on axes
+        self._add_section_braces(ax1, boundaries, seq_len)
+        
+        # Don't mark image token positions to preserve color visibility
+        
+        # Second subplot: Focus on response-to-demonstration attention with improved visualization
+        demo_start, demo_end = boundaries['demonstration']
+        response_start, response_end = boundaries['response']
+
+        print(f"response_start: {response_start}, response_end: {response_end}, demo_start: {demo_start}, demo_end: {demo_end}")
+        
+        if response_start < seq_len and demo_start < seq_len:
+            response_to_demo = attention_matrix[response_start:min(response_end, seq_len), 
+                                             demo_start:min(demo_end, seq_len)]
             
-            # Draw individual demo boundaries in the focused view
+            # Apply same log transformation for consistency
+            response_to_demo_vis = np.log(response_to_demo + 1e-8)
+            
+            im2 = ax2.imshow(response_to_demo_vis, cmap='viridis', aspect='equal', origin='upper',
+                           vmin=np.percentile(response_to_demo_vis, 20),
+                           vmax=np.percentile(response_to_demo_vis, 80))
+            ax2.set_title(f'Layer {layer_idx}: Response→Demonstration Attention (Log Scale)\n(Response tokens attend to Demo tokens)', fontsize=16)
+            ax2.set_xlabel('Demonstration Token Position (relative)', fontsize=14)
+            ax2.set_ylabel('Response Token Position (relative)', fontsize=14)
+            
+            # Add colorbar
+            cbar2 = plt.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
+            cbar2.set_label('Log Attention Score', rotation=270, labelpad=15, fontsize=12)
+            
+            # Add attention values on the focused heatmap with improved visibility
+            if response_to_demo.shape[0] <= 50 and response_to_demo.shape[1] <= 50:  # Increase threshold
+                for i in tqdm(range(response_to_demo.shape[0]), total=response_to_demo.shape[0], desc="Adding attention values", leave=False):
+                    for j in range(response_to_demo.shape[1]):
+                        value = response_to_demo[i, j]
+                        # Only show values above threshold
+                        if value > 0.001:
+                            # Format to 2 significant digits
+                            if value >= 0.01:
+                                text = f'{value:.2f}'
+                            elif value >= 0.001:
+                                text = f'{value:.3f}'
+                            else:
+                                text = f'{value:.1e}'
+                            
+                            # Use adaptive text color for better contrast on viridis colormap
+                            text_color = 'white' if response_to_demo_vis[i, j] > np.percentile(response_to_demo_vis, 50) else 'red'
+                            ax2.text(j, i, text, ha='center', va='center', 
+                                    color=text_color, fontsize=10, fontweight='bold')
+            
+            # Draw individual demo boundaries in the focused view with better visibility
             demo_offset = 0
             for i, demo_length in enumerate([end - start for start, end in demo_boundaries]):
                 if demo_offset + demo_length <= response_to_demo.shape[1]:
-                    ax2.axvline(x=demo_offset, color='white', linestyle='--', linewidth=1, alpha=0.8)
-                    ax2.axvline(x=demo_offset + demo_length, color='white', linestyle='--', linewidth=1, alpha=0.8)
+                    ax2.axvline(x=demo_offset, color='red', linestyle='-', linewidth=2, alpha=0.9)
+                    ax2.axvline(x=demo_offset + demo_length, color='red', linestyle='-', linewidth=2, alpha=0.9)
                     
-                    # Add demo labels
-                    if demo_length > 5:  # Only label if demo is long enough
-                        ax2.text(demo_offset + demo_length/2, -2, f'Demo {i+1}', 
-                                ha='center', va='top', color='white', fontsize=12, fontweight='bold')
+                    # Add demo labels with better visibility
+                    if demo_length > 3:  # Lower threshold for labels
+                        ax2.text(demo_offset + demo_length/2, -3, f'Demo {i+1}', 
+                                ha='center', va='top', color='red', fontsize=14, fontweight='bold',
+                                bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.8))
                 demo_offset += demo_length
         
         plt.tight_layout()
+
+        print(f"save_dir: {save_dir}")
         
-                 # Save the figure as vector format (PDF) and high-res PNG
-         save_path_pdf = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.pdf')
-         save_path_png = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.png')
-         
-         plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
-         plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
+        # Save the figure as vector format (PDF) and high-res PNG
+        save_path_pdf = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.pdf')
+        save_path_png = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.png')
+        
+        plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
+        plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         
+        print(f"save_path_pdf: {save_path_pdf}")
         # Create a summary statistics plot
         self._create_attention_statistics_plot(attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx)
+        print("create_attention_statistics_plot done")
     
     def _create_attention_statistics_plot(self, attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx):
         """Create statistical analysis plots for attention patterns."""
@@ -460,11 +500,11 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         
         plt.tight_layout()
         
-        # Save the statistics plot as vector format and high-res PNG
-        save_path_svg = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.svg')
+        # Save the statistics plot as vector format (PDF) and high-res PNG
+        save_path_pdf = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.pdf')
         save_path_png = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.png')
         
-        plt.savefig(save_path_svg, format='svg', bbox_inches='tight', facecolor='white')
+        plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
         plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
 
