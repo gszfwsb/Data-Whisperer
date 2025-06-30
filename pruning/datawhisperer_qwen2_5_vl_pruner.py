@@ -1,6 +1,8 @@
 import os
 import re
 import torch
+import uuid
+import logging
 from sklearn.model_selection import KFold
 from typing import List, Dict, Any, Optional
 from PIL import Image
@@ -29,6 +31,24 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
     def __init__(self, args: Any) -> None:
         self.args = args
         self.accelerator = Accelerator()
+        
+        # Setup logging
+        self.logger = logging.getLogger(self.__class__.__name__)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            
+        # Set logging level from args if available, otherwise INFO
+        log_level = getattr(args, 'log_level', 'INFO').upper()
+        self.logger.setLevel(getattr(logging, log_level, logging.INFO))
+        
+        # Generate unique ID for this run
+        self.unique_id = str(uuid.uuid4())[:8]  # Use first 8 characters
+        self.logger.info(f"Initializing DataWhisperer Pruner with unique ID: {self.unique_id}")
         
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.args.model_path, torch_dtype=torch.bfloat16
@@ -125,7 +145,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             
         if save_path:
             plt.savefig(save_path, dpi=150, bbox_inches='tight')
-            print(f"Causal mask visualization saved to: {save_path}")
+            self.logger.info(f"Causal mask visualization saved to: {save_path}")
         else:
             plt.show()
             
@@ -163,9 +183,14 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         inst, demo, response = prompt_components
         IMAGE_TOKEN = "<|image_pad|>"
         
-        # Create output directory for attention visualizations
-        vis_dir = os.path.join(self.args.output_filtered_path, "attention_visualizations")
+        # Create output directory for attention visualizations with unique ID
+        vis_dir = os.path.join(self.args.output_filtered_path, f"attention_visualizations_{self.unique_id}")
         os.makedirs(vis_dir, exist_ok=True)
+        
+        # Save text components to file
+        self._save_text_components(inst, demo, response, vis_dir, batch_idx)
+        
+        self.logger.info(f"Saving attention visualizations to: {vis_dir}")
         
         # Count image tokens in each section
         inst_imgs_num = inst.count(IMAGE_TOKEN)
@@ -214,6 +239,36 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             
         print(f"Attention visualizations saved to: {vis_dir}")
     
+    def _save_text_components(self, inst, demo, response, vis_dir, batch_idx):
+        """Save instruction, demonstration, and response text to a file."""
+        text_file_path = os.path.join(vis_dir, f'text_components_batch_{batch_idx}.txt')
+        
+        with open(text_file_path, 'w', encoding='utf-8') as f:
+            f.write("=" * 80 + "\n")
+            f.write(f"TEXT COMPONENTS FOR BATCH {batch_idx}\n")
+            f.write("=" * 80 + "\n\n")
+            
+            f.write("INSTRUCTION:\n")
+            f.write("-" * 40 + "\n")
+            f.write(inst + "\n\n")
+            
+            f.write("DEMONSTRATION:\n")
+            f.write("-" * 40 + "\n")
+            f.write(demo + "\n\n")
+            
+            f.write("RESPONSE:\n")
+            f.write("-" * 40 + "\n")
+            f.write(response + "\n\n")
+            
+            f.write("=" * 80 + "\n")
+            f.write(f"STATISTICS:\n")
+            f.write(f"Instruction length: {len(inst)} characters\n")
+            f.write(f"Demonstration length: {len(demo)} characters\n")
+            f.write(f"Response length: {len(response)} characters\n")
+            f.write(f"Total length: {len(inst) + len(demo) + len(response)} characters\n")
+        
+        self.logger.debug(f"Text components saved to: {text_file_path}")
+
     def _find_image_token_positions(self, encoding, batch_idx, image_token):
         """Find positions of image tokens in the tokenized sequence."""
         # Get the tokenized input_ids for this batch item
@@ -384,20 +439,18 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         
         plt.tight_layout()
 
-        print(f"save_dir: {save_dir}")
+        self.logger.debug(f"Saving attention visualization to: {save_dir}")
         
-        # Save the figure as vector format (PDF) and high-res PNG
+        # Save the figure as PDF only (vector format)
         save_path_pdf = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.pdf')
-        save_path_png = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.png')
         
         plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
-        plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
 
-        print(f"save_path_pdf: {save_path_pdf}")
+        self.logger.debug(f"Attention layer {layer_idx} saved to: {save_path_pdf}")
         # Create a summary statistics plot
         self._create_attention_statistics_plot(attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx)
-        print("create_attention_statistics_plot done")
+        self.logger.debug("Attention statistics plot created")
     
     def _create_attention_statistics_plot(self, attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx):
         """Create statistical analysis plots for attention patterns."""
@@ -417,7 +470,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             demo_attention_scores = []
             demo_labels = []
             
-            print(f"  Bar Plot Response→Demo Calculation (Raw Attention Scores):")
+            self.logger.debug(f"Bar Plot Response→Demo Calculation (Raw Attention Scores):")
             for i, (d_start, d_end) in enumerate(demo_boundaries):
                 if d_end <= attention_matrix.shape[1]:
                     response_slice = attention_matrix[response_start:min(response_end, attention_matrix.shape[0]), d_start:d_end]
@@ -425,7 +478,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                         raw_score = response_slice.mean()
                         demo_attention_scores.append(raw_score)
                         demo_labels.append(f'Demo {i+1}')
-                        print(f"    Demo {i+1}: {raw_score:.6f} (slice shape: {response_slice.shape})")
+                        self.logger.debug(f"    Demo {i+1}: {raw_score:.6f} (slice shape: {response_slice.shape})")
             
             if demo_attention_scores:
                 ax2.bar(demo_labels, demo_attention_scores, color='cyan', alpha=0.7)
@@ -499,27 +552,27 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         plt.tight_layout()
         
         # Print comprehensive debugging information
-        print(f"\n=== Layer {layer_idx} Block-wise Attention Analysis ===")
-        print(f"Attention matrix shape: {attention_matrix.shape}")
-        print(f"Attention range: [{min_val:.6f}, {max_val:.6f}]")
-        print(f"Mean attention: {mean_val:.6f}, Median: {median_val:.6f}")
+        self.logger.debug(f"\n=== Layer {layer_idx} Block-wise Attention Analysis ===")
+        self.logger.debug(f"Attention matrix shape: {attention_matrix.shape}")
+        self.logger.debug(f"Attention range: [{min_val:.6f}, {max_val:.6f}]")
+        self.logger.debug(f"Mean attention: {mean_val:.6f}, Median: {median_val:.6f}")
         
         # Print section-level patterns
-        print(f"\nSection-Level Patterns:")
+        self.logger.debug(f"\nSection-Level Patterns:")
         for pattern_type, values in section_patterns.items():
             if values:
-                print(f"  {pattern_type}:")
+                self.logger.debug(f"  {pattern_type}:")
                 for section, score in values.items():
-                    print(f"    {section}: {score:.6f}")
+                    self.logger.debug(f"    {section}: {score:.6f}")
         
         # Print attention entropy analysis
-        print(f"\nAttention Entropy Analysis:")
-        print(f"  Average entropy: {np.mean(attention_entropy):.4f}")
-        print(f"  Max possible entropy: {max_entropy:.4f}")
-        print(f"  Entropy efficiency: {np.mean(attention_entropy)/max_entropy:.3f} (0=focused, 1=uniform)")
+        self.logger.debug(f"\nAttention Entropy Analysis:")
+        self.logger.debug(f"  Average entropy: {np.mean(attention_entropy):.4f}")
+        self.logger.debug(f"  Max possible entropy: {max_entropy:.4f}")
+        self.logger.debug(f"  Entropy efficiency: {np.mean(attention_entropy)/max_entropy:.3f} (0=focused, 1=uniform)")
         
         # Find and report key attention patterns from block-wise map
-        print(f"\nKey Block-wise Attention Patterns:")
+        self.logger.debug(f"\nKey Block-wise Attention Patterns:")
         
         # Analyze the block-wise attention patterns
         try:
@@ -528,18 +581,18 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             if block_attention_data is not None:
                 self._analyze_block_patterns(block_attention_data, boundaries, demo_boundaries, layer_idx)
         except Exception as e:
-            print(f"  Could not analyze block patterns: {e}")
+            self.logger.debug(f"  Could not analyze block patterns: {e}")
         
-        print(f"  → See block-wise attention heatmap for visual analysis")
-        print("="*60)
+        self.logger.debug(f"  → See block-wise attention heatmap for visual analysis")
+        self.logger.debug("="*60)
         
-        # Save the statistics plot as vector format (PDF) and high-res PNG
+        # Save the statistics plot as PDF only (vector format)
         save_path_pdf = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.pdf')
-        save_path_png = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.png')
         
         plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
-        plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
+        
+        self.logger.debug(f"Attention statistics saved to: {save_path_pdf}")
     
     def _create_blockwise_attention_map(self, attention_matrix, boundaries, demo_boundaries, ax, layer_idx):
         """
@@ -597,8 +650,8 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         n_blocks = len(extended_boundaries)
         block_attention = np.zeros((n_blocks, n_blocks))
         
-        print(f"  Block-wise Attention Map Calculation (Raw Attention Scores):")
-        print(f"    Extended boundaries: {[(label, start, end) for label, (start, end) in zip(extended_labels, extended_boundaries)]}")
+        self.logger.debug(f"  Block-wise Attention Map Calculation (Raw Attention Scores):")
+        self.logger.debug(f"    Extended boundaries: {[(label, start, end) for label, (start, end) in zip(extended_labels, extended_boundaries)]}")
         
         for i, (query_start, query_end) in enumerate(extended_boundaries):
             for j, (key_start, key_end) in enumerate(extended_boundaries):
@@ -614,7 +667,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                         
                         # Debug Response→Demo specifically 
                         if 'Response' in extended_labels[i] and 'Demo' in extended_labels[j]:
-                            print(f"    {extended_labels[i]} → {extended_labels[j]}: {raw_score:.6f} (block shape: {block.shape})")
+                            self.logger.debug(f"    {extended_labels[i]} → {extended_labels[j]}: {raw_score:.6f} (block shape: {block.shape})")
         
         # Store raw block attention for later comparison
         raw_block_attention = block_attention.copy()
@@ -675,7 +728,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     
                     # Debug Response→Demo text annotations specifically
                     if 'Response' in extended_labels[i] and 'Demo' in extended_labels[j]:
-                        print(f"    Text annotation {extended_labels[i]} → {extended_labels[j]}: displaying {text} (raw: {raw_value:.6f})")
+                        self.logger.debug(f"    Text annotation {extended_labels[i]} → {extended_labels[j]}: displaying {text} (raw: {raw_value:.6f})")
         
         # Add grid for better visualization
         ax.set_xticks(np.arange(-0.5, n_blocks, 1), minor=True)
@@ -762,7 +815,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             
             return block_attention, extended_labels
         except Exception as e:
-            print(f"Error creating block attention for analysis: {e}")
+            self.logger.debug(f"Error creating block attention for analysis: {e}")
             return None, None
     
     def _analyze_block_patterns(self, block_attention_tuple, boundaries, demo_boundaries, layer_idx):
@@ -776,7 +829,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         
         n_blocks = len(extended_labels)
         
-        print(f"  Block Pattern Analysis (RAW Attention Scores):")
+        self.logger.debug(f"  Block Pattern Analysis (RAW Attention Scores):")
         
         # Find strongest self-attention blocks
         self_attention_scores = []
@@ -784,10 +837,10 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             self_attention_scores.append((block_attention[i, i], extended_labels[i]))
         self_attention_scores.sort(reverse=True, key=lambda x: x[0])
         
-        print(f"  Strongest Self-Attention (RAW scores):")
+        self.logger.debug(f"  Strongest Self-Attention (RAW scores):")
         for score, label in self_attention_scores[:3]:  # Top 3
             if score > 0:
-                print(f"    {label}: {score:.6f}")
+                self.logger.debug(f"    {label}: {score:.6f}")
         
         # Find strongest cross-attention patterns
         cross_attention = []
@@ -798,16 +851,16 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         
         if cross_attention:
             cross_attention.sort(reverse=True, key=lambda x: x[0])
-            print(f"  Strongest Cross-Attention (RAW scores):")
+            self.logger.debug(f"  Strongest Cross-Attention (RAW scores):")
             for score, pattern in cross_attention[:5]:  # Top 5
-                print(f"    {pattern}: {score:.6f}")
+                self.logger.debug(f"    {pattern}: {score:.6f}")
         
         # Analyze response attention patterns specifically
         response_blocks = [i for i, label in enumerate(extended_labels) if 'Response' in label]
         demo_blocks = [i for i, label in enumerate(extended_labels) if 'Demo' in label]
         
         if response_blocks and demo_blocks:
-            print(f"  Response → Demo Attention (RAW scores):")
+            self.logger.debug(f"  Response → Demo Attention (RAW scores):")
             for resp_idx in response_blocks:
                 resp_label = extended_labels[resp_idx]
                 demo_attentions = []
@@ -816,12 +869,12 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     raw_score = block_attention[resp_idx, demo_idx]
                     if raw_score > 0:
                         demo_attentions.append((raw_score, demo_label))
-                        print(f"    {resp_label} → {demo_label}: {raw_score:.6f}")
+                        self.logger.debug(f"    {resp_label} → {demo_label}: {raw_score:.6f}")
                 
                 if demo_attentions:
                     demo_attentions.sort(reverse=True, key=lambda x: x[0])
                     best_score, best_demo = demo_attentions[0]
-                    print(f"    → {resp_label} most attends to {best_demo}: {best_score:.6f}")
+                    self.logger.debug(f"    → {resp_label} most attends to {best_demo}: {best_score:.6f}")
         
         # Calculate and report attention distribution metrics
         total_attention = block_attention.sum()
@@ -829,9 +882,9 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             diagonal_sum = np.trace(block_attention)
             off_diagonal_sum = total_attention - diagonal_sum
             
-            print(f"  Attention Distribution (RAW scores):")
-            print(f"    Self-attention (diagonal): {diagonal_sum/total_attention:.3f}")
-            print(f"    Cross-attention (off-diagonal): {off_diagonal_sum/total_attention:.3f}")
+            self.logger.debug(f"  Attention Distribution (RAW scores):")
+            self.logger.debug(f"    Self-attention (diagonal): {diagonal_sum/total_attention:.3f}")
+            self.logger.debug(f"    Cross-attention (off-diagonal): {off_diagonal_sum/total_attention:.3f}")
 
     def predict_batch(
         self,
@@ -871,7 +924,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             max_new_tokens = self.args.max_token - prompt_length
             
             if max_new_tokens <= 0:
-                self.accelerator.print(f"{max_new_tokens}:max_new_tokens<0", flush=True)
+                self.accelerator.print(f"{max_new_tokens}:max_new_tokens<0")
                 # Return empty predictions and attention scores if applicable
                 empty_preds = [[""] * len(val_samples) for val_samples in batch_val_samples]
                 if return_attention_scores:
@@ -1059,7 +1112,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             IMAGE_BASE_DIR = "/obs/users/benhao/llava-en-zh-2k"
             images = [Image.open(os.path.join(IMAGE_BASE_DIR, p)).convert("RGB") for p in all_image_paths]
         except FileNotFoundError as e:
-            self.accelerator.print(f"Error loading image: {e}", flush=True)
+            self.accelerator.print(f"Error loading image: {e}")
             return None, None, None
 
         return prompt, images, (inst, demo, response)
@@ -1099,9 +1152,8 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                     )
                 score.index_add_(0, train_idx, local_score)
                 count.index_add_(0, train_idx, local_count)
-                print(
-                    f"Fold {fold_idx + 1}/{self.args.k_folds} evaluation completed",
-                    flush=True,
+                self.logger.info(
+                    f"Fold {fold_idx + 1}/{self.args.k_folds} evaluation completed"
                 )
         else:
             assert (
@@ -1132,7 +1184,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         output_path = os.path.join(self.args.output_filtered_path, f"data_whisperer_qwen_vl.json")
 
         save_json(output_path, sorted_dataset_with_scores)
-        print(f"Fold evaluation completed. Results saved to {output_path}")
+        self.logger.info(f"Fold evaluation completed. Results saved to {output_path}")
         return output_path
 
     def _evaluate_single_fold(
@@ -1257,7 +1309,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                 count[selected_indices] += len(references)
         
         progress_bar.close()
-        print(f"Failed batches: {fail}")
+        self.logger.info(f"Failed batches: {fail}")
         for val_sample in val_set:
             prediction = self.predict_batch(train_set, val_sample)
             
@@ -1270,7 +1322,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
                         break
             
             if reference is None:
-                print(f"Warning: Could not find reference answer for validation sample.")
+                self.logger.warning("Could not find reference answer for validation sample.")
                 continue
 
             pred_score = metric_function(prediction, reference)
@@ -1279,7 +1331,7 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
             score += pred_score
             count += 1
         
-        print(f"Evaluation for this fold completed.")
+        self.logger.info(f"Evaluation for this fold completed.")
 
 def test_causal_mask_visualization():
     """
