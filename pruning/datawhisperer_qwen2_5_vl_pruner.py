@@ -10,6 +10,11 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Set matplotlib to use high quality rendering
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['savefig.dpi'] = 300
+plt.rcParams['font.size'] = 10
+
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
 from accelerate import Accelerator
@@ -124,6 +129,343 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
         else:
             plt.show()
             
+        plt.close()
+
+    def visualize_attention_maps_with_boundaries(
+        self, 
+        prompt_attentions, 
+        batch_idx, 
+        prompt_components, 
+        images, 
+        n_i, n_d, n_r, 
+        demo_len, 
+        total_prompt_len,
+        encoding
+    ):
+        """
+        Visualize attention maps for all layers with proper boundaries and image token positions.
+        
+        Args:
+            prompt_attentions: Tuple of attention tensors for each layer
+            batch_idx: Index of current batch item
+            prompt_components: Tuple of (instruction, demonstration, response) texts
+            images: List of images for this batch item
+            n_i: Number of instruction tokens
+            n_d: Number of demonstration tokens  
+            n_r: Number of response tokens
+            demo_len: List of lengths for each demonstration
+            total_prompt_len: Total length of the prompt
+            encoding: Tokenizer encoding output
+        """
+        if not hasattr(self.args, 'save_attention_visualizations') or not self.args.save_attention_visualizations:
+            return
+            
+        inst, demo, response = prompt_components
+        IMAGE_TOKEN = "<|image_pad|>"
+        
+        # Create output directory for attention visualizations
+        vis_dir = os.path.join(self.args.output_filtered_path, "attention_visualizations")
+        os.makedirs(vis_dir, exist_ok=True)
+        
+        # Count image tokens in each section
+        inst_imgs_num = inst.count(IMAGE_TOKEN)
+        demo_imgs_num = demo.count(IMAGE_TOKEN)
+        response_imgs_num = response.count(IMAGE_TOKEN)
+        
+        # Calculate section boundaries
+        boundaries = {
+            'instruction': (0, n_i),
+            'demonstration': (n_i, n_i + n_d),
+            'response': (n_i + n_d, n_i + n_d + n_r)
+        }
+        
+        # Calculate individual demo boundaries within demonstration section
+        demo_boundaries = []
+        demo_start = n_i
+        for demo_length in demo_len:
+            demo_boundaries.append((demo_start, demo_start + demo_length))
+            demo_start += demo_length
+        
+        # Find image token positions
+        image_positions = self._find_image_token_positions(encoding, batch_idx, IMAGE_TOKEN)
+        
+        # Visualize attention for each layer
+        num_layers = len(prompt_attentions)
+        for layer_idx in range(num_layers):
+            layer_attention = prompt_attentions[layer_idx][batch_idx]  # Shape: (num_heads, seq_len, seq_len)
+            
+            # Average over attention heads
+            avg_attention = torch.mean(layer_attention, dim=0)  # Shape: (seq_len, seq_len)
+            
+            # Slice to actual prompt length
+            attention_matrix = avg_attention[:total_prompt_len, :total_prompt_len].detach().cpu().numpy()
+            
+            # Create visualization
+            self._create_attention_visualization(
+                attention_matrix,
+                layer_idx,
+                boundaries,
+                demo_boundaries,
+                image_positions,
+                vis_dir,
+                batch_idx,
+                total_prompt_len
+            )
+            
+        print(f"Attention visualizations saved to: {vis_dir}")
+    
+    def _find_image_token_positions(self, encoding, batch_idx, image_token):
+        """Find positions of image tokens in the tokenized sequence."""
+        # Get the tokenized input_ids for this batch item
+        input_ids = encoding.input_ids[batch_idx]
+        
+        # Get the image token ID
+        image_token_id = self.tokenizer.convert_tokens_to_ids(image_token)
+        
+        # Find all positions where image tokens appear
+        image_positions = []
+        for pos, token_id in enumerate(input_ids):
+            if token_id == image_token_id:
+                image_positions.append(pos.item() if torch.is_tensor(pos) else pos)
+        
+        return image_positions
+    
+    def _add_section_braces(self, ax, boundaries, seq_len):
+        """Add braces to indicate section boundaries on X and Y axes."""
+        colors = {'instruction': 'red', 'demonstration': 'blue', 'response': 'green'}
+        
+        # Get axis limits
+        ylim = ax.get_ylim()
+        xlim = ax.get_xlim()
+        
+        # Add braces on X-axis (bottom)
+        brace_offset_x = seq_len * 0.08  # Offset from the main plot
+        for section, (start, end) in boundaries.items():
+            if start < seq_len:
+                end = min(end, seq_len)
+                mid_pos = (start + end) / 2
+                
+                # Draw brace
+                self._draw_brace(ax, start, end, ylim[0] + brace_offset_x, 'horizontal', colors[section])
+                
+                # Add label
+                ax.text(mid_pos, ylim[0] + brace_offset_x * 1.5, section.capitalize(), 
+                       ha='center', va='bottom', color=colors[section], 
+                       fontsize=12, fontweight='bold')
+        
+        # Add braces on Y-axis (left)
+        brace_offset_y = seq_len * 0.08  # Offset from the main plot
+        for section, (start, end) in boundaries.items():
+            if start < seq_len:
+                end = min(end, seq_len)
+                mid_pos = (start + end) / 2
+                
+                # Draw brace
+                self._draw_brace(ax, start, end, xlim[0] - brace_offset_y, 'vertical', colors[section])
+                
+                # Add label
+                ax.text(xlim[0] - brace_offset_y * 1.5, mid_pos, section.capitalize(), 
+                       ha='right', va='center', color=colors[section], 
+                       fontsize=12, fontweight='bold', rotation=90)
+    
+    def _draw_brace(self, ax, start, end, offset, orientation, color):
+        """Draw a brace to indicate a section."""
+        if orientation == 'horizontal':
+            # Draw horizontal brace (for X-axis)
+            # Main horizontal line
+            ax.plot([start, end], [offset, offset], color=color, linewidth=2)
+            # Start vertical line
+            ax.plot([start, start], [offset - 1, offset + 1], color=color, linewidth=2)
+            # End vertical line  
+            ax.plot([end, end], [offset - 1, offset + 1], color=color, linewidth=2)
+        else:  # vertical
+            # Draw vertical brace (for Y-axis)
+            # Main vertical line
+            ax.plot([offset, offset], [start, end], color=color, linewidth=2)
+            # Start horizontal line
+            ax.plot([offset - 1, offset + 1], [start, start], color=color, linewidth=2)
+            # End horizontal line
+            ax.plot([offset - 1, offset + 1], [end, end], color=color, linewidth=2)
+    
+    def _create_attention_visualization(
+        self, 
+        attention_matrix, 
+        layer_idx, 
+        boundaries, 
+        demo_boundaries, 
+        image_positions, 
+        save_dir, 
+        batch_idx, 
+        seq_len
+    ):
+        """
+        Create a comprehensive attention visualization with boundaries and annotations.
+        """
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30, 15))  # Make it much larger
+        
+        # Main attention heatmap
+        im1 = ax1.imshow(attention_matrix, cmap='viridis', aspect='auto', origin='upper')
+        ax1.set_title(f'Layer {layer_idx} Attention Matrix\n(Batch {batch_idx}, Seq Length: {seq_len})', fontsize=16)
+        ax1.set_xlabel('Key Position', fontsize=14)
+        ax1.set_ylabel('Query Position', fontsize=14)
+        
+        # Add colorbar for attention magnitude
+        cbar1 = plt.colorbar(im1, ax=ax1, fraction=0.046, pad=0.04)
+        cbar1.set_label('Attention Score', rotation=270, labelpad=15, fontsize=12)
+        
+        # Add attention values on the heatmap (only for smaller matrices to avoid clutter)
+        if seq_len <= 50:  # Only show values for smaller matrices
+            for i in range(min(seq_len, attention_matrix.shape[0])):
+                for j in range(min(seq_len, attention_matrix.shape[1])):
+                    value = attention_matrix[i, j]
+                    # Format to 2 significant digits
+                    if value >= 0.01:
+                        text = f'{value:.2f}'
+                    elif value >= 0.001:
+                        text = f'{value:.3f}'
+                    else:
+                        text = f'{value:.1e}'
+                    ax1.text(j, i, text, ha='center', va='center', 
+                            color='red', fontsize=8, fontweight='bold')
+        
+        # Add section braces on axes
+        self._add_section_braces(ax1, boundaries, seq_len)
+        
+                 # Don't mark image token positions to preserve color visibility
+        
+        # Second subplot: Focus on response-to-demonstration attention
+        demo_start, demo_end = boundaries['demonstration']
+        response_start, response_end = boundaries['response']
+        
+        if response_start < seq_len and demo_start < seq_len:
+            response_to_demo = attention_matrix[response_start:min(response_end, seq_len), 
+                                             demo_start:min(demo_end, seq_len)]
+            
+            im2 = ax2.imshow(response_to_demo, cmap='plasma', aspect='auto', origin='upper')
+            ax2.set_title(f'Layer {layer_idx}: Response→Demonstration Attention\n(Response tokens attend to Demo tokens)', fontsize=16)
+            ax2.set_xlabel('Demonstration Token Position (relative)', fontsize=14)
+            ax2.set_ylabel('Response Token Position (relative)', fontsize=14)
+            
+            # Add colorbar
+            cbar2 = plt.colorbar(im2, ax=ax2, fraction=0.046, pad=0.04)
+            cbar2.set_label('Attention Score', rotation=270, labelpad=15, fontsize=12)
+            
+            # Add attention values on the focused heatmap (if small enough)
+            if response_to_demo.shape[0] <= 30 and response_to_demo.shape[1] <= 30:
+                for i in range(response_to_demo.shape[0]):
+                    for j in range(response_to_demo.shape[1]):
+                        value = response_to_demo[i, j]
+                        # Format to 2 significant digits
+                        if value >= 0.01:
+                            text = f'{value:.2f}'
+                        elif value >= 0.001:
+                            text = f'{value:.3f}'
+                        else:
+                            text = f'{value:.1e}'
+                        ax2.text(j, i, text, ha='center', va='center', 
+                                color='red', fontsize=8, fontweight='bold')
+            
+            # Draw individual demo boundaries in the focused view
+            demo_offset = 0
+            for i, demo_length in enumerate([end - start for start, end in demo_boundaries]):
+                if demo_offset + demo_length <= response_to_demo.shape[1]:
+                    ax2.axvline(x=demo_offset, color='white', linestyle='--', linewidth=1, alpha=0.8)
+                    ax2.axvline(x=demo_offset + demo_length, color='white', linestyle='--', linewidth=1, alpha=0.8)
+                    
+                    # Add demo labels
+                    if demo_length > 5:  # Only label if demo is long enough
+                        ax2.text(demo_offset + demo_length/2, -2, f'Demo {i+1}', 
+                                ha='center', va='top', color='white', fontsize=12, fontweight='bold')
+                demo_offset += demo_length
+        
+        plt.tight_layout()
+        
+                 # Save the figure as vector format (PDF) and high-res PNG
+         save_path_pdf = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.pdf')
+         save_path_png = os.path.join(save_dir, f'attention_layer_{layer_idx}_batch_{batch_idx}.png')
+         
+         plt.savefig(save_path_pdf, format='pdf', bbox_inches='tight', facecolor='white')
+         plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        # Create a summary statistics plot
+        self._create_attention_statistics_plot(attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx)
+    
+    def _create_attention_statistics_plot(self, attention_matrix, layer_idx, boundaries, demo_boundaries, save_dir, batch_idx):
+        """Create statistical analysis plots for attention patterns."""
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+        
+        # 1. Attention distribution across sections
+        section_attention = {}
+        for section, (start, end) in boundaries.items():
+            end = min(end, attention_matrix.shape[0])
+            if start < attention_matrix.shape[0]:
+                section_scores = attention_matrix[start:end, :].mean(axis=0)
+                section_attention[section] = section_scores.mean()
+        
+        ax1.bar(section_attention.keys(), section_attention.values(), color=['red', 'blue', 'green'], alpha=0.7)
+        ax1.set_title(f'Layer {layer_idx}: Average Attention by Section')
+        ax1.set_ylabel('Average Attention Score')
+        ax1.tick_params(axis='x', rotation=45)
+        
+        # 2. Response attention to individual demonstrations
+        response_start, response_end = boundaries['response']
+        demo_start, demo_end = boundaries['demonstration']
+        
+        if response_start < attention_matrix.shape[0] and demo_start < attention_matrix.shape[1]:
+            demo_attention_scores = []
+            demo_labels = []
+            
+            for i, (d_start, d_end) in enumerate(demo_boundaries):
+                if d_end <= attention_matrix.shape[1]:
+                    response_slice = attention_matrix[response_start:min(response_end, attention_matrix.shape[0]), d_start:d_end]
+                    if response_slice.size > 0:
+                        demo_attention_scores.append(response_slice.mean())
+                        demo_labels.append(f'Demo {i+1}')
+            
+            if demo_attention_scores:
+                ax2.bar(demo_labels, demo_attention_scores, color='cyan', alpha=0.7)
+                ax2.set_title(f'Layer {layer_idx}: Response Attention to Each Demo')
+                ax2.set_ylabel('Average Attention Score')
+                ax2.tick_params(axis='x', rotation=45)
+        
+        # 3. Attention entropy across sequence positions
+        attention_entropy = []
+        for i in range(attention_matrix.shape[0]):
+            row = attention_matrix[i, :]
+            # Add small epsilon to avoid log(0)
+            row = row + 1e-10
+            entropy = -np.sum(row * np.log(row))
+            attention_entropy.append(entropy)
+        
+        ax3.plot(attention_entropy, color='purple', linewidth=2)
+        ax3.set_title(f'Layer {layer_idx}: Attention Entropy by Position')
+        ax3.set_xlabel('Sequence Position')
+        ax3.set_ylabel('Attention Entropy')
+        ax3.grid(True, alpha=0.3)
+        
+        # Add section boundaries to entropy plot
+        colors = {'instruction': 'red', 'demonstration': 'blue', 'response': 'green'}
+        for section, (start, end) in boundaries.items():
+            ax3.axvline(x=start, color=colors[section], linestyle='--', alpha=0.7, label=f'{section.capitalize()}')
+        ax3.legend()
+        
+        # 4. Attention magnitude distribution
+        ax4.hist(attention_matrix.flatten(), bins=50, alpha=0.7, color='orange', edgecolor='black')
+        ax4.set_title(f'Layer {layer_idx}: Attention Score Distribution')
+        ax4.set_xlabel('Attention Score')
+        ax4.set_ylabel('Frequency')
+        ax4.axvline(x=attention_matrix.mean(), color='red', linestyle='--', linewidth=2, label=f'Mean: {attention_matrix.mean():.4f}')
+        ax4.legend()
+        
+        plt.tight_layout()
+        
+        # Save the statistics plot as vector format and high-res PNG
+        save_path_svg = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.svg')
+        save_path_png = os.path.join(save_dir, f'attention_stats_layer_{layer_idx}_batch_{batch_idx}.png')
+        
+        plt.savefig(save_path_svg, format='svg', bbox_inches='tight', facecolor='white')
+        plt.savefig(save_path_png, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
 
     def predict_batch(
@@ -300,6 +642,19 @@ class DataWhisperer_Qwen2_5VL_Pruner(Pruner):
 
                     demo_idx += demo_len[i]
 
+                # Visualize attention maps for all layers with boundaries
+
+                self.visualize_attention_maps_with_boundaries(
+                    prompt_attentions, 
+                    idx, 
+                    prompts_comp[idx], 
+                    batch_images[idx], 
+                    n_i, n_d, n_r, 
+                    demo_len, 
+                    total_prompt_len,
+                    encoding
+                )
+                
                 attn_layer.append(demo_attn)
 
             return batch_predictions, attn_layer
