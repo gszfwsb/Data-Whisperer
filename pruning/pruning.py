@@ -33,11 +33,12 @@ def run_pruning(args):
     pruner.do_pruning()
 
 if __name__ == "__main__":
-    import debugpy
-    debugpy.listen(5678)
-    print("Waiting for debugger attach...")
-    debugpy.wait_for_client()
 
+    # Benhao: uncomment this to debug the code
+    # import debugpy
+    # debugpy.listen(5679)
+    # print("Waiting for debugger attach...")
+    # debugpy.wait_for_client()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True, help="Path to the pretrained model")
@@ -58,6 +59,8 @@ if __name__ == "__main__":
     parser.add_argument("--attn_layer", type=int, default=None)
     parser.add_argument("--memory_output_file", type=str, default="cuda_memory_usage.txt", help="File to save peak CUDA memory usage")
     parser.add_argument("--gpu_index", type=int, default=0, help="Index of the GPU to monitor (default: 0)")
+    parser.add_argument("--log_level", type=str, default='INFO', help="Logging level") 
+    parser.add_argument("--save_attention_visualizations", type=bool, default=True, help="Save attention visualizations")
     args = parser.parse_args()
 
     if not torch.cuda.is_available():
