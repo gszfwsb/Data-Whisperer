@@ -63,6 +63,9 @@ bash scripts/run.sh
 
 Upon completion of the experiment, the scored dataset will be generated and stored in the `results/pruning` directory. You can then select data points based on the corresponding metric to construct a coreset.
 
+## :pencil2: Post-Training
+We followed [Llama-Factory](https://github.com/hiyouga/LLaMA-Factory) for all fine-tuning experiments.
+
 ## 📝 Citation
 If you find **Data Whisperer** useful for your research and applications, please kindly cite using this BibTeX:
 ```latex
